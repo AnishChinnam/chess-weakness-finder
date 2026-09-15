@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chess Weakness Finder</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 600px; margin: 60px auto; padding: 20px; background: #1a1a1a; color: #eee; }
+        h1 { color: #6cf; }
+        input[type=text] { padding: 10px; font-size: 16px; width: 300px; border-radius: 4px; border: 1px solid #444; background: #2a2a2a; color: #eee; }
+        button { padding: 10px 20px; font-size: 16px; background: #6cf; border: none; border-radius: 4px; cursor: pointer; color: #000; font-weight: bold; }
+        button:hover { background: #4ae; }
+        .note { color: #888; font-size: 14px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>Chess Weakness Finder</h1>
+    <p>Enter a Lichess username to analyze their last 5 blitz games and find their patterns.</p>
+    <form action="/analyze" method="post">
+        <input type="text" name="username" placeholder="Lichess username" required>
+        <button type="submit">Analyze</button>
+    </form>
+    <p class="note">Analysis takes 30-60 seconds. Grab water.</p>
+</body>
+</html>

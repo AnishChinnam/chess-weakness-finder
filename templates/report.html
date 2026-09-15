@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Report</title>
+    <style>
+        body { font-family: system-ui, sans-serif; max-width: 700px; margin: 60px auto; padding: 20px; background: #1a1a1a; color: #eee; }
+        h1, h2 { color: #6cf; }
+        .stat { font-size: 24px; margin: 10px 0; }
+        .label { color: #888; font-size: 14px; }
+        ul { line-height: 1.8; }
+        a { color: #6cf; }
+        .error { color: #f66; padding: 20px; background: #2a1a1a; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    {% if report.error %}
+        <div class="error">{{ report.error }}</div>
+        <p><a href="/">← Try another username</a></p>
+    {% else %}
+        <h1>Report for {{ report.username }}</h1>
+        <p class="label">Based on {{ report.games_analyzed }} recent blitz games</p>
+        
+        <h2>Summary</h2>
+        <div class="stat">{{ report.total_mistakes }} mistakes ({{ report.avg_mistakes }} per game)</div>
+        <div class="stat">{{ report.total_inaccuracies }} inaccuracies</div>
+        
+        <h2>When mistakes happen</h2>
+        <ul>
+        {% for phase, count in report.phase_breakdown.items() %}
+            <li><strong>{{ phase }}:</strong> {{ count }} mistakes</li>
+        {% endfor %}
+        </ul>
+        
+        <h2>Openings with most mistakes</h2>
+        <ul>
+        {% for opening, count in report.worst_openings %}
+            <li>{{ opening }} — {{ count }} mistakes</li>
+        {% endfor %}
+        </ul>
+        
+        <h2>Openings you lose in</h2>
+        <ul>
+        {% for opening, count in report.losing_openings %}
+            <li>{{ opening }} — {{ count }} losses</li>
+        {% endfor %}
+        </ul>
+        
+        <p><a href="/">← Analyze another player</a></p>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Environment / secrets
+.env
+
+# Editor
+.vscode/
+
+# Unrelated build artifacts that live in this folder
+anish
+SoccerScores
+SoccerScores.cpp
+SoccerScores.dSYM/
