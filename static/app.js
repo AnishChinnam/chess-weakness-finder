@@ -191,12 +191,34 @@ function terminalWhiteCp(board) {
 // --- Mistake-theme detection: classify WHY a mistake happened -----------------
 const PIECE_VAL = { p: 100, n: 300, b: 300, r: 500, q: 900, k: 0 };
 
+// To monetize later, swap any `resource.url` below for an affiliate link
+// (e.g. a Chessable or Amazon Associates URL) — the UI picks it up automatically.
 const THEME_META = {
-  hung: { name: "Hanging pieces", tip: "Before every move, check what your opponent can capture for free — especially on moves that look obvious." },
-  missed_tactic: { name: "Missed tactics", tip: "Scan the forcing moves (checks, captures, threats) before you commit. Daily tactics puzzles help most here." },
-  endgame: { name: "Endgame technique", tip: "Study core endgames (king-and-pawn, rook endgames) and slow down when converting a winning position." },
-  opening: { name: "Opening mistakes", tip: "Learn the first ~8 moves and the plans of one opening as White and one defense as Black." },
-  positional: { name: "Positional slips", tip: "Improve your worst-placed piece and avoid creating weaknesses you can't defend." },
+  hung: {
+    name: "Hanging pieces",
+    tip: "Before every move, check what your opponent can capture for free — especially on moves that look obvious.",
+    resource: { label: "Train board vision & simple tactics →", url: "https://lichess.org/training" },
+  },
+  missed_tactic: {
+    name: "Missed tactics",
+    tip: "Scan the forcing moves (checks, captures, threats) before you commit. Daily tactics puzzles help most here.",
+    resource: { label: "Do a daily puzzle set on Lichess →", url: "https://lichess.org/training/mix" },
+  },
+  endgame: {
+    name: "Endgame technique",
+    tip: "Study core endgames (king-and-pawn, rook endgames) and slow down when converting a winning position.",
+    resource: { label: "Practice endgames interactively →", url: "https://lichess.org/practice" },
+  },
+  opening: {
+    name: "Opening mistakes",
+    tip: "Learn the first ~8 moves and the plans of one opening as White and one defense as Black.",
+    resource: { label: "Learn a repertoire on Chessable →", url: "https://www.chessable.com/" },
+  },
+  positional: {
+    name: "Positional slips",
+    tip: "Improve your worst-placed piece and avoid creating weaknesses you can't defend.",
+    resource: { label: "Study strategy lessons on Chess.com →", url: "https://www.chess.com/lessons" },
+  },
 };
 
 // How much material the side to move can win immediately (1-ply exchange guess).
@@ -520,14 +542,18 @@ function renderReport(r) {
     weaknessHtml =
       "<h2>Your top recurring weaknesses</h2>" +
       '<div class="section weakness">' +
-      r.weaknesses.map((w, i) =>
-        '<div class="weak-row"><div class="weak-head">' +
-        '<span class="weak-rank">#' + (i + 1) + "</span>" +
-        '<span class="weak-name">' + esc(w.name) + "</span>" +
-        '<span class="weak-count">' + w.count + "×</span></div>" +
-        '<div class="bar-track"><div class="bar-fill bad" style="width:' + (w.count / maxW * 100) + '%"></div></div>' +
-        '<div class="weak-tip">' + esc(w.tip) + "</div></div>"
-      ).join("") +
+      r.weaknesses.map((w, i) => {
+        const meta = THEME_META[w.key] || {};
+        const link = meta.resource
+          ? '<a class="weak-link" href="' + meta.resource.url + '" target="_blank" rel="noopener noreferrer">' + esc(meta.resource.label) + "</a>"
+          : "";
+        return '<div class="weak-row"><div class="weak-head">' +
+          '<span class="weak-rank">#' + (i + 1) + "</span>" +
+          '<span class="weak-name">' + esc(w.name) + "</span>" +
+          '<span class="weak-count">' + w.count + "×</span></div>" +
+          '<div class="bar-track"><div class="bar-fill bad" style="width:' + (w.count / maxW * 100) + '%"></div></div>' +
+          '<div class="weak-tip">' + esc(w.tip) + "</div>" + link + "</div>";
+      }).join("") +
       (r.time_trouble && r.time_trouble.count > 0
         ? '<div class="weak-time">⏱ ' + r.time_trouble.pct + "% of your mistakes (" + r.time_trouble.count +
           ") came with under 30s on the clock — play the opening faster to save time for the moments that decide the game.</div>"
