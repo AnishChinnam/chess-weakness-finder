@@ -19,6 +19,9 @@ Built with Python, FastAPI, and the Stockfish chess engine.
   - Which **phase** (opening / middlegame / endgame) mistakes cluster in
   - Which **openings** produce the most mistakes
   - Which **openings** the player loses in most
+  - **Board diagrams of the biggest mistakes** — each position is shown with an
+    arrow for the move played (red) vs. the engine's best move (green), plus the
+    eval before and after
 
 ## Tech stack
 
@@ -79,7 +82,7 @@ Then open http://127.0.0.1:8000, pick a site, and enter a username.
 
 - ~~Support rapid in addition to blitz~~ ✅ done (classical still TODO)
 - ~~Support Chess.com in addition to Lichess~~ ✅ done
-- ~~Let the user choose how many games to analyze~~ ✅ done (5 / 25 / 50 / 100)
-- Show the specific positions where mistakes happened
+- ~~Let the user choose how many games to analyze~~ ✅ done (5 / 10 / 25 / 50 / 100)
+- ~~Show the specific positions where mistakes happened~~ ✅ done (board diagrams)
 - Compare two players side by side
 - Cache results so repeat lookups are instant

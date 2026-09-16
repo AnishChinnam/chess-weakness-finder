@@ -70,6 +70,25 @@
         .bar-fill.bad { background: linear-gradient(90deg, #ff8a5c, var(--bad)); }
         .count { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
 
+        .mistakes-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .mistake-card {
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--border); border-radius: 14px; padding: 16px;
+        }
+        .mistake-card .board { border-radius: 8px; overflow: hidden; line-height: 0; }
+        .mistake-card .board svg { width: 100%; height: auto; display: block; }
+        .mistake-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .mistake-where { color: var(--muted); font-size: 13px; }
+        .sev { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; color: #0b1020; background: var(--warn); }
+        .sev.Blunder { color: #fff; background: var(--bad); }
+        .moves { margin-top: 12px; font-size: 14px; }
+        .moves .m { display: flex; justify-content: space-between; padding: 5px 0; }
+        .moves .played .san { color: var(--bad); font-weight: 700; }
+        .moves .best .san { color: var(--accent-2); font-weight: 700; }
+        .moves .ev { color: var(--muted); font-variant-numeric: tabular-nums; }
+        .legend { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+        .legend .sw { display: inline-block; width: 22px; height: 3px; border-radius: 2px; vertical-align: middle; margin: 0 4px 0 12px; }
+
         .error {
             background: linear-gradient(180deg, var(--panel), var(--panel-2));
             border: 1px solid var(--bad); border-radius: 14px; padding: 24px; color: var(--bad);
@@ -112,6 +131,29 @@
                 <div class="cap">Mistakes / game</div>
             </div>
         </div>
+
+        {% if report.key_mistakes %}
+        <h2>Your biggest mistakes</h2>
+        <p class="legend">
+            <span class="sw" style="background:#e5534b"></span>move played
+            <span class="sw" style="background:#57ab5a"></span>engine's best
+        </p>
+        <div class="mistakes-grid">
+            {% for m in report.key_mistakes %}
+            <div class="mistake-card">
+                <div class="mistake-top">
+                    <span class="mistake-where">Game {{ m.game_num }} · move {{ m.move_number }} · {{ m.phase }}</span>
+                    <span class="sev {{ 'Blunder' if m.severity == 'Blunder' else '' }}">{{ m.severity }}</span>
+                </div>
+                <div class="board">{{ m.svg | safe }}</div>
+                <div class="moves">
+                    <div class="m played"><span>You played <span class="san">{{ m.played_san }}</span></span><span class="ev">{{ m.played_eval_str }}</span></div>
+                    <div class="m best"><span>Best was <span class="san">{{ m.best_san }}</span></span><span class="ev">{{ m.best_eval_str }}</span></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
 
         {% set max_phase = (report.phase_breakdown.values() | list | max) if report.phase_breakdown else 0 %}
         <h2>When mistakes happen</h2>

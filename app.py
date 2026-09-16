@@ -6,6 +6,7 @@ import requests
 import chess
 import chess.pgn
 import chess.engine
+import chess.svg
 import io
 from collections import Counter
 
@@ -115,6 +116,50 @@ def opening_name(game) -> str:
     return game.headers.get("ECO", "Unknown")
 
 
+def format_eval(cp: int) -> str:
+    """Format a centipawn score (player POV) as a readable string."""
+    if cp >= 9000:
+        return "+M"
+    if cp <= -9000:
+        return "-M"
+    return f"{cp / 100:+.1f}"
+
+
+def severity(swing: int) -> str:
+    """Label a mistake by how much eval it threw away (in centipawns)."""
+    if swing >= 500:
+        return "Blunder"
+    if swing >= 300:
+        return "Big mistake"
+    return "Mistake"
+
+
+def render_board_svg(mistake: dict) -> str:
+    """Render the position before the mistake, with arrows for the move played
+    (red) and the engine's best move (green), oriented to the player's side."""
+    board = chess.Board(mistake["fen_before"])
+    arrows = []
+    played = chess.Move.from_uci(mistake["played_uci"])
+    arrows.append(chess.svg.Arrow(played.from_square, played.to_square, color="#e5534b"))
+    if mistake["best_uci"]:
+        best = chess.Move.from_uci(mistake["best_uci"])
+        arrows.append(chess.svg.Arrow(best.from_square, best.to_square, color="#57ab5a"))
+    orientation = chess.WHITE if mistake["orientation"] else chess.BLACK
+    return chess.svg.board(board, orientation=orientation, arrows=arrows,
+                           size=320, coordinates=True)
+
+
+def decorate_mistake(mistake: dict) -> dict:
+    """Add display-ready fields (SVG, formatted evals, severity) to a mistake."""
+    return {
+        **mistake,
+        "svg": render_board_svg(mistake),
+        "played_eval_str": format_eval(mistake["played_eval"]),
+        "best_eval_str": format_eval(mistake["best_eval"]),
+        "severity": severity(mistake["swing"]),
+    }
+
+
 def analyze_player(username: str, site: str = "lichess", num_games: int = 5,
                    time_control: str = "both", time_per_move: float = 0.1):
     """Pull games from the chosen site and return a weakness report as a dict."""
@@ -139,6 +184,7 @@ def analyze_player(username: str, site: str = "lichess", num_games: int = 5,
     mistakes_by_phase = Counter()
     mistakes_by_opening = Counter()
     losing_openings = Counter()
+    key_mistakes = []
     games_analyzed = 0
 
     def get_phase(move_number):
@@ -166,15 +212,25 @@ def analyze_player(username: str, site: str = "lichess", num_games: int = 5,
 
         board = game.board()
         move_number = 0
-        previous_eval = 0
+        # Analyse the starting position so we know the eval AND the best move
+        # for the position the player is about to move in. For any move, the
+        # position "before" it is the one we analysed on the previous ply, so
+        # this costs only one extra engine call per game.
+        prev_info = engine.analyse(board, chess.engine.Limit(time=time_per_move))
+        previous_eval = prev_info["score"].white().score(mate_score=10000) or 0
 
         for move in game.mainline_moves():
             move_number += 1
-            board.push(move)
+            board_before = board.copy()
+            # Best move in the position the player actually faced.
+            pv = prev_info.get("pv") or []
+            best_move = pv[0] if pv else None
 
+            board.push(move)
             info = engine.analyse(board, chess.engine.Limit(time=time_per_move))
             score = info["score"].white().score(mate_score=10000)
             if score is None:
+                prev_info = info
                 continue
 
             eval_change = score - previous_eval
@@ -198,16 +254,39 @@ def analyze_player(username: str, site: str = "lichess", num_games: int = 5,
                 total_mistakes += 1
                 mistakes_by_phase[get_phase(move_number)] += 1
                 mistakes_by_opening[opening] += 1
+
+                # Evals from the player's point of view (positive = good for them).
+                sign = 1 if user_is_white else -1
+                key_mistakes.append({
+                    "game_num": games_analyzed,
+                    "move_number": move_number,
+                    "phase": get_phase(move_number),
+                    "opening": opening,
+                    "fen_before": board_before.fen(),
+                    "played_uci": move.uci(),
+                    "best_uci": best_move.uci() if best_move else None,
+                    "played_san": board_before.san(move),
+                    "best_san": board_before.san(best_move) if best_move else "?",
+                    "played_eval": sign * score,        # eval after the move played
+                    "best_eval": sign * previous_eval,  # eval had they played best
+                    "swing": abs(eval_change),
+                    "orientation": user_is_white,
+                })
             elif is_inaccuracy:
                 total_inaccuracies += 1
 
             previous_eval = score
+            prev_info = info
 
     engine.quit()
 
     if games_analyzed == 0:
         label = TIME_CONTROL_LABELS.get(time_control, "blitz & rapid")
         return {"error": f"No {label} games found for '{username}' on {SITE_NAMES.get(site, site)}."}
+
+    # Show the worst handful of mistakes as board diagrams (biggest eval swings).
+    key_mistakes.sort(key=lambda m: m["swing"], reverse=True)
+    top_mistakes = [decorate_mistake(m) for m in key_mistakes[:8]]
 
     return {
         "username": username,
@@ -220,6 +299,7 @@ def analyze_player(username: str, site: str = "lichess", num_games: int = 5,
         "phase_breakdown": dict(mistakes_by_phase.most_common()),
         "worst_openings": mistakes_by_opening.most_common(5),
         "losing_openings": losing_openings.most_common(5),
+        "key_mistakes": top_mistakes,
     }
 
 
