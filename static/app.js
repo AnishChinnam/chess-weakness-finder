@@ -55,6 +55,7 @@ class Engine {
         stmCp = 0;
       }
       const whiteCp = this._turn === "w" ? stmCp : -stmCp;
+      if (this._timer) { clearTimeout(this._timer); this._timer = null; }
       const r = this._resolve;
       this._resolve = null;
       r({ whiteCp: whiteCp, bestUci: bestUci });
@@ -74,12 +75,30 @@ class Engine {
       this._lastCp = null;
       this._lastMate = null;
       this._turn = fen.split(" ")[1] || "w";
+      // Watchdog: if the engine never replies (a crashed/stuck worker), don't
+      // hang the whole run — resolve with a "no data" result and move on.
+      this._timer = setTimeout(() => {
+        if (this._resolve) {
+          const r = this._resolve;
+          this._resolve = null;
+          this._timer = null;
+          r({ whiteCp: null, bestUci: null, timeout: true });
+        }
+      }, movetime + 4000);
       this.worker.postMessage("position fen " + fen);
       this.worker.postMessage("go movetime " + movetime);
     });
   }
 
+  async restart() {
+    this.quit();
+    this.worker = new Worker("vendor/stockfish.js");
+    this.worker.onmessage = (e) => this._onMessage(e);
+    await this.init();
+  }
+
   quit() {
+    if (this._timer) { clearTimeout(this._timer); this._timer = null; }
     try { this.worker.terminate(); } catch (e) {}
   }
 }
@@ -160,6 +179,13 @@ function getPhase(moveNumber) {
   if (moveNumber <= 12) return "opening";
   if (moveNumber <= 30) return "middlegame";
   return "endgame";
+}
+
+// Eval (white POV) for a finished position, without touching the engine —
+// analysing a game-over position (no legal moves) can hang the browser engine.
+function terminalWhiteCp(board) {
+  if (board.in_checkmate()) return board.turn() === "w" ? -10000 : 10000;
+  return 0; // stalemate / other draw
 }
 
 function formatEval(cp) {
@@ -290,7 +316,8 @@ async function analyze(params, hooks) {
       let moveNumber = 0;
 
       let prev = await engine.analyse(board.fen(), movetime);
-      let previousEval = prev.whiteCp;
+      if (prev.timeout) await engine.restart();
+      let previousEval = prev.whiteCp === null ? 0 : prev.whiteCp;
       done++;
       hooks.onProgress(done / totalPlies, "Game " + (gi + 1) + "/" + parsed.length);
       if (hooks.cancelled()) throw { cancelled: true };
@@ -303,8 +330,18 @@ async function analyze(params, hooks) {
         const playedUci = mv.from + mv.to + (mv.promotion || "");
 
         board.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
-        const after = await engine.analyse(board.fen(), movetime);
-        const score = after.whiteCp;
+
+        let after;
+        if (board.game_over()) {
+          // Don't ask the engine about a finished position — compute directly.
+          after = { whiteCp: terminalWhiteCp(board), bestUci: null };
+        } else {
+          after = await engine.analyse(board.fen(), movetime);
+          if (after.timeout) await engine.restart();
+        }
+        // A timed-out analysis has no data; treat as "no change" so we neither
+        // crash nor invent a mistake.
+        const score = after.whiteCp === null ? previousEval : after.whiteCp;
         const evalChange = score - previousEval;
         const whiteJustMoved = board.turn() === "b";
 
