@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chess Weakness Finder</title>
+    <style>
+        :root {
+            --bg: #0e1117; --panel: #161b22; --panel-2: #1c2230; --border: #2a3140;
+            --text: #e6edf3; --muted: #8b949e; --accent: #7c9cff; --accent-2: #5ce0c6;
+            --warn: #ffb454; --bad: #ff6b6b;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+            margin: 0; min-height: 100vh; color: var(--text);
+            background:
+                radial-gradient(900px 500px at 15% -10%, rgba(124,156,255,0.16), transparent 60%),
+                radial-gradient(800px 500px at 100% 0%, rgba(92,224,198,0.12), transparent 55%),
+                var(--bg);
+            padding: 40px 24px 60px;
+        }
+        .wrap { max-width: 760px; margin: 0 auto; }
+
+        /* --- Home card --- */
+        .card {
+            width: 100%; max-width: 520px; margin: 20px auto;
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--border); border-radius: 18px; padding: 40px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+        }
+        .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+        .brand .piece { font-size: 34px; line-height: 1; filter: drop-shadow(0 3px 8px rgba(124,156,255,0.5)); }
+        h1 {
+            margin: 0; font-size: 27px; letter-spacing: -0.5px;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .subtitle { color: var(--muted); font-size: 15px; line-height: 1.55; margin: 14px 0 28px; }
+        label { display: block; font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); margin-bottom: 7px; }
+        .field { margin-bottom: 18px; }
+        .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        input[type=text], select {
+            width: 100%; padding: 12px 14px; font-size: 15px; color: var(--text);
+            background: #0d1117; border: 1px solid var(--border); border-radius: 10px;
+            outline: none; transition: border-color .15s, box-shadow .15s; appearance: none;
+        }
+        select {
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+            background-repeat: no-repeat; background-position: right 12px center; padding-right: 38px; cursor: pointer;
+        }
+        input[type=text]:focus, select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124,156,255,0.2); }
+        button.cta {
+            width: 100%; margin-top: 8px; padding: 14px; font-size: 16px; font-weight: 700; color: #0b1020;
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            border: none; border-radius: 10px; cursor: pointer; transition: transform .08s, filter .15s;
+        }
+        button.cta:hover { filter: brightness(1.07); }
+        button.cta:active { transform: translateY(1px); }
+        button.cta:disabled { filter: grayscale(0.4) brightness(0.8); cursor: default; }
+        .note { color: var(--muted); font-size: 13px; margin-top: 22px; text-align: center; line-height: 1.5; }
+
+        /* --- Progress --- */
+        .progress-box { max-width: 520px; margin: 20px auto; text-align: center; }
+        .bar-outer { height: 12px; background: #0d1117; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; margin: 16px 0 10px; }
+        .bar-inner { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .2s; }
+        .progress-text { color: var(--muted); font-size: 14px; }
+
+        /* --- Report --- */
+        a.back { color: var(--accent); text-decoration: none; font-size: 14px; cursor: pointer; }
+        a.back:hover { text-decoration: underline; }
+        .rheader { margin: 18px 0 28px; }
+        h1.rtitle { font-size: 30px; }
+        .rtitle .name { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        .meta { color: var(--muted); font-size: 14px; margin-top: 8px; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; background: rgba(124,156,255,0.14); border: 1px solid var(--border); color: var(--accent); font-size: 12px; margin-left: 6px; }
+
+        .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 32px; }
+        .tile { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+        .tile .big { font-size: 30px; font-weight: 700; }
+        .tile .big.bad { color: var(--bad); }
+        .tile .big.warn { color: var(--warn); }
+        .tile .cap { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 4px; }
+
+        h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin: 30px 0 14px; }
+        .section { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--border); border-radius: 14px; padding: 8px 20px; }
+        .rowline { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--border); }
+        .rowline:last-child { border-bottom: none; }
+        .rowline .lbl { flex: 0 0 160px; text-transform: capitalize; }
+        .rowline .lbl.wide { flex: 0 0 300px; max-width: 55%; }
+        .bar-track { flex: 1; height: 10px; background: #0d1117; border-radius: 999px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+        .bar-fill.bad { background: linear-gradient(90deg, #ff8a5c, var(--bad)); }
+        .count { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
+
+        .mistakes-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+        .mistake-card { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+        .mistake-card .board { border-radius: 8px; overflow: hidden; line-height: 0; }
+        .mistake-card .board svg { width: 100%; height: auto; display: block; }
+        .mistake-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .mistake-where { color: var(--muted); font-size: 13px; }
+        .sev { font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; color: #0b1020; background: var(--warn); }
+        .sev.Blunder { color: #fff; background: var(--bad); }
+        .moves { margin-top: 12px; font-size: 14px; }
+        .moves .m { display: flex; justify-content: space-between; padding: 5px 0; }
+        .moves .played .san { color: var(--bad); font-weight: 700; }
+        .moves .best .san { color: var(--accent-2); font-weight: 700; }
+        .moves .ev { color: var(--muted); font-variant-numeric: tabular-nums; }
+        .legend { color: var(--muted); font-size: 12px; margin: 0 0 14px; }
+        .legend .sw { display: inline-block; width: 22px; height: 3px; border-radius: 2px; vertical-align: middle; margin: 0 4px 0 12px; }
+        .empty { color: var(--muted); padding: 14px 0; }
+        .error { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--bad); border-radius: 14px; padding: 24px; color: var(--bad); max-width: 520px; margin: 20px auto; }
+        .footer { margin-top: 32px; }
+        .hidden { display: none; }
+        @media (max-width: 560px) {
+            .tiles { grid-template-columns: 1fr; }
+            .mistakes-grid { grid-template-columns: 1fr; }
+            .rowline .lbl, .rowline .lbl.wide { flex-basis: 120px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <!-- HOME -->
+        <div id="home" class="card">
+            <div class="brand">
+                <span class="piece">♞</span>
+                <h1>Chess Weakness Finder</h1>
+            </div>
+            <p class="subtitle">
+                Pick a site and a username. Stockfish runs <em>right in your browser</em> to
+                replay their recent games and reveal where mistakes actually happen —
+                by phase, by opening, and on the board.
+            </p>
+            <form id="form">
+                <div class="field">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" placeholder="e.g. hikaru" required autofocus>
+                </div>
+                <div class="grid2">
+                    <div class="field">
+                        <label for="site">Site</label>
+                        <select id="site" name="site">
+                            <option value="lichess">Lichess</option>
+                            <option value="chesscom">Chess.com</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="time_control">Time control</label>
+                        <select id="time_control" name="time_control">
+                            <option value="both">Blitz &amp; Rapid</option>
+                            <option value="blitz">Blitz</option>
+                            <option value="rapid">Rapid</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="field">
+                    <label for="num_games">Games to analyze</label>
+                    <select id="num_games" name="num_games">
+                        <option value="5">Last 5 games</option>
+                        <option value="10">Last 10 games</option>
+                        <option value="25">Last 25 games</option>
+                        <option value="50">Last 50 games</option>
+                        <option value="100">Last 100 games</option>
+                    </select>
+                </div>
+                <button type="submit" class="cta" id="go">Analyze weaknesses</button>
+            </form>
+            <p class="note">
+                Analysis runs on your device, so nothing is uploaded and it's free to run.<br>
+                ~20–40 seconds for 5 games; longer for 100. ☕
+            </p>
+        </div>
+
+        <!-- PROGRESS -->
+        <div id="progress" class="progress-box hidden">
+            <div class="brand" style="justify-content:center"><span class="piece">♞</span><h1>Analyzing…</h1></div>
+            <div class="bar-outer"><div class="bar-inner" id="bar"></div></div>
+            <div class="progress-text" id="progress-text">Starting engine…</div>
+            <p class="note"><a class="back" id="cancel">Cancel</a></p>
+        </div>
+
+        <!-- RESULTS -->
+        <div id="results" class="hidden"></div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>
