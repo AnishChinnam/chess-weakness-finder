@@ -339,6 +339,19 @@ function renderBoardSvg(fen, whiteBottom, arrows) {
   return '<svg viewBox="0 0 ' + size + " " + size + '" xmlns="http://www.w3.org/2000/svg"><defs>' + defs + "</defs>" + squares + cells + arrowSvg + "</svg>";
 }
 
+// Add display-ready fields (board SVG, formatted evals, severity) to a mistake.
+function decorateMistake(m) {
+  return Object.assign({}, m, {
+    svg: renderBoardSvg(m.fen_before, m.orientation, [
+      { from: m.played_uci.slice(0, 2), to: m.played_uci.slice(2, 4), color: "#e5534b" },
+      m.best_uci ? { from: m.best_uci.slice(0, 2), to: m.best_uci.slice(2, 4), color: "#57ab5a" } : null,
+    ]),
+    played_eval_str: formatEval(m.played_eval),
+    best_eval_str: formatEval(m.best_eval),
+    severity: severity(m.swing),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Main analysis
 // ---------------------------------------------------------------------------
@@ -448,6 +461,7 @@ async function analyze(params, hooks) {
             move_number: moveNumber,
             phase: getPhase(moveNumber),
             theme: theme,
+            opening: opening,
             fen_before: fenBefore,
             played_uci: playedUci,
             best_uci: bestUci,
@@ -476,17 +490,16 @@ async function analyze(params, hooks) {
   }
 
   keyMistakes.sort((a, b) => b.swing - a.swing);
-  const top = keyMistakes.slice(0, 8).map((m) => Object.assign({}, m, {
-    svg: renderBoardSvg(m.fen_before, m.orientation, [
-      { from: m.played_uci.slice(0, 2), to: m.played_uci.slice(2, 4), color: "#e5534b" },
-      m.best_uci ? { from: m.best_uci.slice(0, 2), to: m.best_uci.slice(2, 4), color: "#57ab5a" } : null,
-    ]),
-    played_eval_str: formatEval(m.played_eval),
-    best_eval_str: formatEval(m.best_eval),
-    severity: severity(m.swing),
-  }));
+  const top = keyMistakes.slice(0, 8).map(decorateMistake);
 
   const sortEntries = (obj) => Object.entries(obj).sort((a, b) => b[1] - a[1]);
+  // For each opening the player errs in most, show a representative (worst)
+  // mistake as a board diagram. keyMistakes is sorted worst-first, so the first
+  // match per opening is that opening's biggest blunder.
+  const openingWeaknesses = sortEntries(byOpening).slice(0, 4).map(([name, count]) => {
+    const rep = keyMistakes.find((m) => m.opening === name);
+    return rep ? { name: name, count: count, mistake: decorateMistake(rep) } : null;
+  }).filter(Boolean);
   const weaknesses = sortEntries(byTheme).slice(0, 3).map(([key, count]) => ({
     key: key,
     name: THEME_META[key].name,
@@ -509,6 +522,7 @@ async function analyze(params, hooks) {
     time_trouble: timeTrouble,
     phase_breakdown: sortEntries(byPhase),
     worst_openings: sortEntries(byOpening).slice(0, 5),
+    opening_weaknesses: openingWeaknesses,
     losing_openings: sortEntries(losingOpenings).slice(0, 5),
     key_mistakes: top,
   };
@@ -582,9 +596,31 @@ function renderReport(r) {
   const phaseRows = r.phase_breakdown.length
     ? barRows(r.phase_breakdown, maxPhase, "", "mistakes")
     : '<div class="empty">No mistakes flagged — clean games. ♟️</div>';
-  const openRows = r.worst_openings.length
-    ? barRows(r.worst_openings, maxOpen, "bad", "mistakes")
-    : '<div class="empty">No opening racked up mistakes.</div>';
+
+  let openingVisualHtml = "";
+  if (r.opening_weaknesses && r.opening_weaknesses.length) {
+    openingVisualHtml =
+      "<h2>Openings you go wrong in</h2>" +
+      '<p class="legend"><span class="sw" style="background:#e5534b"></span>move played' +
+      '<span class="sw" style="background:#57ab5a"></span>engine\'s best</p>' +
+      '<div class="mistakes-grid">' +
+      r.opening_weaknesses.map((o) => {
+        const m = o.mistake;
+        return '<div class="mistake-card"><div class="mistake-top">' +
+          '<span class="mistake-where">' + esc(o.name) + "</span>" +
+          '<span class="weak-count">' + o.count + " mistake" + (o.count === 1 ? "" : "s") + "</span></div>" +
+          '<div class="board">' + m.svg + "</div>" +
+          '<div class="moves"><div class="m played"><span>e.g. you played <span class="san">' + esc(m.played_san) + '</span></span><span class="ev">' + m.played_eval_str + "</span></div>" +
+          '<div class="m best"><span>Best was <span class="san">' + esc(m.best_san) + '</span></span><span class="ev">' + m.best_eval_str + "</span></div></div></div>";
+      }).join("") +
+      "</div>";
+  } else {
+    const openRows = r.worst_openings.length
+      ? barRows(r.worst_openings, maxOpen, "bad", "mistakes")
+      : '<div class="empty">No opening racked up mistakes.</div>';
+    openingVisualHtml = '<h2>Openings with most mistakes</h2><div class="section">' + openRows + "</div>";
+  }
+
   const lossRows = r.losing_openings.length
     ? barRows(r.losing_openings, maxLoss, "bad", "losses")
     : '<div class="empty">No losses in this sample. 🎉</div>';
@@ -602,7 +638,7 @@ function renderReport(r) {
     weaknessHtml +
     mistakesHtml +
     "<h2>When mistakes happen</h2><div class=\"section\">" + phaseRows + "</div>" +
-    "<h2>Openings with most mistakes</h2><div class=\"section\">" + openRows + "</div>" +
+    openingVisualHtml +
     "<h2>Openings you lose in</h2><div class=\"section\">" + lossRows + "</div>" +
     '<p class="footer"><a class="back" id="back2">← Analyze another player</a></p>'
   );
