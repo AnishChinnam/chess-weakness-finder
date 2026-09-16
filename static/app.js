@@ -188,6 +188,54 @@ function terminalWhiteCp(board) {
   return 0; // stalemate / other draw
 }
 
+// --- Mistake-theme detection: classify WHY a mistake happened -----------------
+const PIECE_VAL = { p: 100, n: 300, b: 300, r: 500, q: 900, k: 0 };
+
+const THEME_META = {
+  hung: { name: "Hanging pieces", tip: "Before every move, check what your opponent can capture for free — especially on moves that look obvious." },
+  missed_tactic: { name: "Missed tactics", tip: "Scan the forcing moves (checks, captures, threats) before you commit. Daily tactics puzzles help most here." },
+  endgame: { name: "Endgame technique", tip: "Study core endgames (king-and-pawn, rook endgames) and slow down when converting a winning position." },
+  opening: { name: "Opening mistakes", tip: "Learn the first ~8 moves and the plans of one opening as White and one defense as Black." },
+  positional: { name: "Positional slips", tip: "Improve your worst-placed piece and avoid creating weaknesses you can't defend." },
+};
+
+// How much material the side to move can win immediately (1-ply exchange guess).
+function droppedMaterial(fenAfter) {
+  let best = 0;
+  let b;
+  try { b = new Chess(fenAfter); } catch (e) { return 0; }
+  const caps = b.moves({ verbose: true }).filter((m) => m.captured);
+  for (const m of caps) {
+    const gain = PIECE_VAL[m.captured] || 0;
+    const nb = new Chess(fenAfter);
+    nb.move({ from: m.from, to: m.to, promotion: m.promotion });
+    const recapture = nb.moves({ verbose: true }).some((x) => x.to === m.to && x.captured);
+    const net = recapture ? gain - (PIECE_VAL[m.piece] || 0) : gain; // undefended = free
+    if (net > best) best = net;
+  }
+  return best;
+}
+
+// Assign one primary theme, concrete labels first.
+function classifyMistake(o) {
+  if (droppedMaterial(o.fenAfter) >= 200) return "hung";
+  if (o.bestEval - o.playedEval >= 300 && o.bestEval >= 150) return "missed_tactic";
+  if (o.phase === "endgame") return "endgame";
+  if (o.phase === "opening") return "opening";
+  return "positional";
+}
+
+// Pull per-ply remaining clock (seconds) from PGN %clk comments, in move order.
+function parseClocks(pgn) {
+  const re = /%clk\s+(\d+):(\d+):(\d+(?:\.\d+)?)/g;
+  const out = [];
+  let m;
+  while ((m = re.exec(pgn))) {
+    out.push((+m[1]) * 3600 + (+m[2]) * 60 + parseFloat(m[3]));
+  }
+  return out;
+}
+
 function formatEval(cp) {
   if (cp >= 9000) return "+M";
   if (cp <= -9000) return "-M";
@@ -282,7 +330,7 @@ async function analyze(params, hooks) {
   for (const pgn of games) {
     const c = new Chess();
     if (!c.load_pgn(pgn, { sloppy: true })) continue;
-    parsed.push({ header: c.header(), moves: c.history({ verbose: true }) });
+    parsed.push({ header: c.header(), moves: c.history({ verbose: true }), clocks: parseClocks(pgn) });
   }
   if (parsed.length === 0) {
     throw new Error("No " + TC_LABELS[timeControl] + " games found for '" + username + "' on " + SITE_NAMES[site] + ".");
@@ -298,6 +346,8 @@ async function analyze(params, hooks) {
 
   let totalMistakes = 0, totalInaccuracies = 0, gamesAnalyzed = 0;
   const byPhase = {}, byOpening = {}, losingOpenings = {}, keyMistakes = [];
+  const byTheme = {};
+  let timeTroubleMistakes = 0, mistakesWithClock = 0;
   const bump = (obj, k) => { obj[k] = (obj[k] || 0) + 1; };
 
   try {
@@ -330,6 +380,7 @@ async function analyze(params, hooks) {
         const playedUci = mv.from + mv.to + (mv.promotion || "");
 
         board.move({ from: mv.from, to: mv.to, promotion: mv.promotion });
+        const fenAfter = board.fen();
 
         let after;
         if (board.game_over()) {
@@ -359,17 +410,29 @@ async function analyze(params, hooks) {
           bump(byPhase, getPhase(moveNumber));
           bump(byOpening, opening);
           const sign = userIsWhite ? 1 : -1;
+          const playedEval = sign * score;
+          const bestEval = sign * previousEval;
+          const theme = classifyMistake({ fenAfter: fenAfter, phase: getPhase(moveNumber), playedEval: playedEval, bestEval: bestEval });
+          bump(byTheme, theme);
+
+          const clockSec = g.clocks[moveNumber - 1];
+          if (typeof clockSec === "number") {
+            mistakesWithClock++;
+            if (clockSec < 30) timeTroubleMistakes++;
+          }
+
           keyMistakes.push({
             game_num: gamesAnalyzed,
             move_number: moveNumber,
             phase: getPhase(moveNumber),
+            theme: theme,
             fen_before: fenBefore,
             played_uci: playedUci,
             best_uci: bestUci,
             played_san: playedSan,
             best_san: sanFromUci(fenBefore, bestUci),
-            played_eval: sign * score,
-            best_eval: sign * previousEval,
+            played_eval: playedEval,
+            best_eval: bestEval,
             swing: Math.abs(evalChange),
             orientation: userIsWhite,
           });
@@ -402,6 +465,16 @@ async function analyze(params, hooks) {
   }));
 
   const sortEntries = (obj) => Object.entries(obj).sort((a, b) => b[1] - a[1]);
+  const weaknesses = sortEntries(byTheme).slice(0, 3).map(([key, count]) => ({
+    key: key,
+    name: THEME_META[key].name,
+    tip: THEME_META[key].tip,
+    count: count,
+  }));
+  const timeTrouble = mistakesWithClock > 0
+    ? { count: timeTroubleMistakes, pct: Math.round((timeTroubleMistakes / totalMistakes) * 100) }
+    : null;
+
   return {
     username: username,
     site: SITE_NAMES[site],
@@ -410,6 +483,8 @@ async function analyze(params, hooks) {
     total_mistakes: totalMistakes,
     total_inaccuracies: totalInaccuracies,
     avg_mistakes: Math.round((totalMistakes / gamesAnalyzed) * 10) / 10,
+    weaknesses: weaknesses,
+    time_trouble: timeTrouble,
     phase_breakdown: sortEntries(byPhase),
     worst_openings: sortEntries(byOpening).slice(0, 5),
     losing_openings: sortEntries(losingOpenings).slice(0, 5),
@@ -439,6 +514,27 @@ function renderReport(r) {
   const maxOpen = r.worst_openings.length ? r.worst_openings[0][1] : 0;
   const maxLoss = r.losing_openings.length ? r.losing_openings[0][1] : 0;
 
+  let weaknessHtml = "";
+  if (r.weaknesses.length) {
+    const maxW = r.weaknesses[0].count;
+    weaknessHtml =
+      "<h2>Your top recurring weaknesses</h2>" +
+      '<div class="section weakness">' +
+      r.weaknesses.map((w, i) =>
+        '<div class="weak-row"><div class="weak-head">' +
+        '<span class="weak-rank">#' + (i + 1) + "</span>" +
+        '<span class="weak-name">' + esc(w.name) + "</span>" +
+        '<span class="weak-count">' + w.count + "×</span></div>" +
+        '<div class="bar-track"><div class="bar-fill bad" style="width:' + (w.count / maxW * 100) + '%"></div></div>' +
+        '<div class="weak-tip">' + esc(w.tip) + "</div></div>"
+      ).join("") +
+      (r.time_trouble && r.time_trouble.count > 0
+        ? '<div class="weak-time">⏱ ' + r.time_trouble.pct + "% of your mistakes (" + r.time_trouble.count +
+          ") came with under 30s on the clock — play the opening faster to save time for the moments that decide the game.</div>"
+        : "") +
+      "</div>";
+  }
+
   let mistakesHtml = "";
   if (r.key_mistakes.length) {
     mistakesHtml =
@@ -448,7 +544,7 @@ function renderReport(r) {
       '<div class="mistakes-grid">' +
       r.key_mistakes.map((m) =>
         '<div class="mistake-card"><div class="mistake-top">' +
-        '<span class="mistake-where">Game ' + m.game_num + " · move " + Math.ceil(m.move_number / 2) + " · " + m.phase + "</span>" +
+        '<span class="mistake-where">Game ' + m.game_num + " · move " + Math.ceil(m.move_number / 2) + " · " + (THEME_META[m.theme] ? THEME_META[m.theme].name : m.phase) + "</span>" +
         '<span class="sev ' + (m.severity === "Blunder" ? "Blunder" : "") + '">' + m.severity + "</span></div>" +
         '<div class="board">' + m.svg + "</div>" +
         '<div class="moves"><div class="m played"><span>You played <span class="san">' + esc(m.played_san) + '</span></span><span class="ev">' + m.played_eval_str + "</span></div>" +
@@ -477,6 +573,7 @@ function renderReport(r) {
     '<div class="tile"><div class="big warn">' + r.total_inaccuracies + '</div><div class="cap">Inaccuracies</div></div>' +
     '<div class="tile"><div class="big">' + r.avg_mistakes + '</div><div class="cap">Mistakes / game</div></div>' +
     "</div>" +
+    weaknessHtml +
     mistakesHtml +
     "<h2>When mistakes happen</h2><div class=\"section\">" + phaseRows + "</div>" +
     "<h2>Openings with most mistakes</h2><div class=\"section\">" + openRows + "</div>" +

@@ -93,6 +93,16 @@
         .bar-fill.bad { background: linear-gradient(90deg, #ff8a5c, var(--bad)); }
         .count { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
 
+        .section.weakness { padding: 6px 20px 14px; }
+        .weak-row { padding: 16px 0; border-bottom: 1px solid var(--border); }
+        .weak-row:last-child { border-bottom: none; }
+        .weak-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; }
+        .weak-rank { color: var(--accent); font-weight: 700; font-size: 14px; }
+        .weak-name { font-size: 18px; font-weight: 700; flex: 1; }
+        .weak-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+        .weak-tip { color: var(--muted); font-size: 13px; line-height: 1.5; margin-top: 8px; }
+        .weak-time { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: rgba(255,180,84,0.1); border: 1px solid rgba(255,180,84,0.3); color: #ffcf87; font-size: 13px; line-height: 1.5; }
+
         .mistakes-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
         .mistake-card { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
         .mistake-card .board { border-radius: 8px; overflow: hidden; line-height: 0; }
