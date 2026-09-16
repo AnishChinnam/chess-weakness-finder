@@ -1,51 +1,168 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Report</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Report{% if not report.error %} · {{ report.username }}{% endif %}</title>
     <style>
-        body { font-family: system-ui, sans-serif; max-width: 700px; margin: 60px auto; padding: 20px; background: #1a1a1a; color: #eee; }
-        h1, h2 { color: #6cf; }
-        .stat { font-size: 24px; margin: 10px 0; }
-        .label { color: #888; font-size: 14px; }
-        ul { line-height: 1.8; }
-        a { color: #6cf; }
-        .error { color: #f66; padding: 20px; background: #2a1a1a; border-radius: 4px; }
+        :root {
+            --bg: #0e1117;
+            --panel: #161b22;
+            --panel-2: #1c2230;
+            --border: #2a3140;
+            --text: #e6edf3;
+            --muted: #8b949e;
+            --accent: #7c9cff;
+            --accent-2: #5ce0c6;
+            --warn: #ffb454;
+            --bad: #ff6b6b;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            color: var(--text);
+            background:
+                radial-gradient(900px 500px at 15% -10%, rgba(124,156,255,0.16), transparent 60%),
+                radial-gradient(800px 500px at 100% 0%, rgba(92,224,198,0.12), transparent 55%),
+                var(--bg);
+            padding: 40px 24px 60px;
+        }
+        .wrap { max-width: 760px; margin: 0 auto; }
+        a.back { color: var(--accent); text-decoration: none; font-size: 14px; }
+        a.back:hover { text-decoration: underline; }
+
+        .header { margin: 18px 0 28px; }
+        h1 { margin: 0 0 8px; font-size: 30px; letter-spacing: -0.5px; }
+        h1 .name {
+            background: linear-gradient(90deg, var(--accent), var(--accent-2));
+            -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .meta { color: var(--muted); font-size: 14px; }
+        .badge {
+            display: inline-block; padding: 3px 10px; border-radius: 999px;
+            background: rgba(124,156,255,0.14); border: 1px solid var(--border);
+            color: var(--accent); font-size: 12px; margin-left: 6px;
+        }
+
+        .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 32px; }
+        .tile {
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--border); border-radius: 14px; padding: 20px;
+        }
+        .tile .big { font-size: 30px; font-weight: 700; }
+        .tile .big.bad { color: var(--bad); }
+        .tile .big.warn { color: var(--warn); }
+        .tile .cap { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 4px; }
+
+        h2 { font-size: 15px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin: 30px 0 14px; }
+        .section {
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--border); border-radius: 14px; padding: 8px 20px;
+        }
+        .rowline { display: flex; align-items: center; gap: 14px; padding: 13px 0; border-bottom: 1px solid var(--border); }
+        .rowline:last-child { border-bottom: none; }
+        .rowline .lbl { flex: 0 0 160px; text-transform: capitalize; }
+        .rowline .lbl.wide { flex: 0 0 300px; max-width: 55%; }
+        .bar-track { flex: 1; height: 10px; background: #0d1117; border-radius: 999px; overflow: hidden; }
+        .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+        .bar-fill.bad { background: linear-gradient(90deg, #ff8a5c, var(--bad)); }
+        .count { flex: 0 0 auto; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 70px; text-align: right; }
+
+        .error {
+            background: linear-gradient(180deg, var(--panel), var(--panel-2));
+            border: 1px solid var(--bad); border-radius: 14px; padding: 24px; color: var(--bad);
+        }
+        .empty { color: var(--muted); padding: 14px 0; }
+        .footer { margin-top: 32px; }
+
+        @media (max-width: 560px) {
+            .tiles { grid-template-columns: 1fr; }
+            .rowline .lbl, .rowline .lbl.wide { flex-basis: 120px; }
+        }
     </style>
 </head>
 <body>
+    <div class="wrap">
     {% if report.error %}
         <div class="error">{{ report.error }}</div>
-        <p><a href="/">← Try another username</a></p>
+        <p class="footer"><a class="back" href="/">← Try another player</a></p>
     {% else %}
-        <h1>Report for {{ report.username }}</h1>
-        <p class="label">Based on {{ report.games_analyzed }} recent blitz games</p>
-        
-        <h2>Summary</h2>
-        <div class="stat">{{ report.total_mistakes }} mistakes ({{ report.avg_mistakes }} per game)</div>
-        <div class="stat">{{ report.total_inaccuracies }} inaccuracies</div>
-        
+        <a class="back" href="/">← Analyze another player</a>
+        <div class="header">
+            <h1>Report for <span class="name">{{ report.username }}</span></h1>
+            <div class="meta">
+                {{ report.games_analyzed }} recent {{ report.time_control }} games
+                <span class="badge">{{ report.site }}</span>
+            </div>
+        </div>
+
+        <div class="tiles">
+            <div class="tile">
+                <div class="big bad">{{ report.total_mistakes }}</div>
+                <div class="cap">Mistakes</div>
+            </div>
+            <div class="tile">
+                <div class="big warn">{{ report.total_inaccuracies }}</div>
+                <div class="cap">Inaccuracies</div>
+            </div>
+            <div class="tile">
+                <div class="big">{{ report.avg_mistakes }}</div>
+                <div class="cap">Mistakes / game</div>
+            </div>
+        </div>
+
+        {% set max_phase = (report.phase_breakdown.values() | list | max) if report.phase_breakdown else 0 %}
         <h2>When mistakes happen</h2>
-        <ul>
-        {% for phase, count in report.phase_breakdown.items() %}
-            <li><strong>{{ phase }}:</strong> {{ count }} mistakes</li>
-        {% endfor %}
-        </ul>
-        
+        <div class="section">
+            {% if report.phase_breakdown %}
+                {% for phase, count in report.phase_breakdown.items() %}
+                <div class="rowline">
+                    <div class="lbl">{{ phase }}</div>
+                    <div class="bar-track"><div class="bar-fill" style="width: {{ (count / max_phase * 100) if max_phase else 0 }}%"></div></div>
+                    <div class="count">{{ count }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty">No mistakes flagged — clean games. ♟️</div>
+            {% endif %}
+        </div>
+
+        {% set max_open = (report.worst_openings[0][1]) if report.worst_openings else 0 %}
         <h2>Openings with most mistakes</h2>
-        <ul>
-        {% for opening, count in report.worst_openings %}
-            <li>{{ opening }} — {{ count }} mistakes</li>
-        {% endfor %}
-        </ul>
-        
+        <div class="section">
+            {% if report.worst_openings %}
+                {% for opening, count in report.worst_openings %}
+                <div class="rowline">
+                    <div class="lbl wide">{{ opening }}</div>
+                    <div class="bar-track"><div class="bar-fill bad" style="width: {{ (count / max_open * 100) if max_open else 0 }}%"></div></div>
+                    <div class="count">{{ count }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty">No opening racked up mistakes.</div>
+            {% endif %}
+        </div>
+
+        {% set max_loss = (report.losing_openings[0][1]) if report.losing_openings else 0 %}
         <h2>Openings you lose in</h2>
-        <ul>
-        {% for opening, count in report.losing_openings %}
-            <li>{{ opening }} — {{ count }} losses</li>
-        {% endfor %}
-        </ul>
-        
-        <p><a href="/">← Analyze another player</a></p>
+        <div class="section">
+            {% if report.losing_openings %}
+                {% for opening, count in report.losing_openings %}
+                <div class="rowline">
+                    <div class="lbl wide">{{ opening }}</div>
+                    <div class="bar-track"><div class="bar-fill bad" style="width: {{ (count / max_loss * 100) if max_loss else 0 }}%"></div></div>
+                    <div class="count">{{ count }}</div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty">No losses in this sample. 🎉</div>
+            {% endif %}
+        </div>
+
+        <p class="footer"><a class="back" href="/">← Analyze another player</a></p>
     {% endif %}
+    </div>
 </body>
 </html>
