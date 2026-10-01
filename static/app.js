@@ -9,6 +9,11 @@ const TC_CLASSES = { blitz: ["blitz"], rapid: ["rapid"], both: ["blitz", "rapid"
 // Stockfish runs client-side (asm.js); a little more time per move than the
 // old server build. Bigger batches get less time so totals stay reasonable.
 const MOVETIME = { 5: 120, 10: 120, 25: 90, 50: 70, 100: 45 };
+// Ignore mistakes made from an already-lost position (player POV, before the
+// move): once you're down ~7 pawns, a further slip didn't decide the game.
+const LOST_CAUSE_CP = -700;
+// A move played with fewer than this many seconds left counts as time trouble.
+const TIME_TROUBLE_SEC = 60;
 
 // ---------------------------------------------------------------------------
 // Stockfish engine wrapper (runs in a Web Worker)
@@ -381,7 +386,7 @@ async function analyze(params, hooks) {
 
   let totalMistakes = 0, totalInaccuracies = 0, gamesAnalyzed = 0;
   const byPhase = {}, byOpening = {}, losingOpenings = {}, keyMistakes = [];
-  const byTheme = {};
+  const byTheme = {}, timeTroubleByPhase = {};
   let timeTroubleMistakes = 0, mistakesWithClock = 0;
   const bump = (obj, k) => { obj[k] = (obj[k] || 0) + 1; };
 
@@ -431,6 +436,9 @@ async function analyze(params, hooks) {
         const evalChange = score - previousEval;
         const whiteJustMoved = board.turn() === "b";
 
+        const sign = userIsWhite ? 1 : -1;
+        const bestEvalPlayer = sign * previousEval; // how good the position was before the move
+
         let isMistake = false, isInaccuracy = false;
         if (whiteJustMoved && userIsWhite) {
           if (evalChange < -200) isMistake = true;
@@ -440,26 +448,33 @@ async function analyze(params, hooks) {
           else if (evalChange > 100) isInaccuracy = true;
         }
 
+        // Lost-cause filter: a slip from an already-lost position didn't decide
+        // anything, so it shouldn't dilute the report.
+        if (bestEvalPlayer <= LOST_CAUSE_CP) { isMistake = false; isInaccuracy = false; }
+
         if (isMistake) {
+          const phase = getPhase(moveNumber);
           totalMistakes++;
-          bump(byPhase, getPhase(moveNumber));
+          bump(byPhase, phase);
           bump(byOpening, opening);
-          const sign = userIsWhite ? 1 : -1;
           const playedEval = sign * score;
-          const bestEval = sign * previousEval;
-          const theme = classifyMistake({ fenAfter: fenAfter, phase: getPhase(moveNumber), playedEval: playedEval, bestEval: bestEval });
+          const bestEval = bestEvalPlayer;
+          const theme = classifyMistake({ fenAfter: fenAfter, phase: phase, playedEval: playedEval, bestEval: bestEval });
           bump(byTheme, theme);
 
           const clockSec = g.clocks[moveNumber - 1];
           if (typeof clockSec === "number") {
             mistakesWithClock++;
-            if (clockSec < 30) timeTroubleMistakes++;
+            if (clockSec < TIME_TROUBLE_SEC) {
+              timeTroubleMistakes++;
+              bump(timeTroubleByPhase, phase);
+            }
           }
 
           keyMistakes.push({
             game_num: gamesAnalyzed,
             move_number: moveNumber,
-            phase: getPhase(moveNumber),
+            phase: phase,
             theme: theme,
             opening: opening,
             fen_before: fenBefore,
@@ -520,7 +535,10 @@ async function analyze(params, hooks) {
     avg_mistakes: Math.round((totalMistakes / gamesAnalyzed) * 10) / 10,
     weaknesses: weaknesses,
     time_trouble: timeTrouble,
-    phase_breakdown: sortEntries(byPhase),
+    has_clock: mistakesWithClock > 0,
+    phase_breakdown: sortEntries(byPhase).map(([phase, count]) => ({
+      phase: phase, count: count, time_trouble: timeTroubleByPhase[phase] || 0,
+    })),
     worst_openings: sortEntries(byOpening).slice(0, 5),
     opening_weaknesses: openingWeaknesses,
     losing_openings: sortEntries(losingOpenings).slice(0, 5),
@@ -546,7 +564,7 @@ function barRows(entries, max, badClass, unit) {
 }
 
 function renderReport(r) {
-  const maxPhase = r.phase_breakdown.length ? Math.max.apply(null, r.phase_breakdown.map((e) => e[1])) : 0;
+  const maxPhase = r.phase_breakdown.length ? Math.max.apply(null, r.phase_breakdown.map((p) => p.count)) : 0;
   const maxOpen = r.worst_openings.length ? r.worst_openings[0][1] : 0;
   const maxLoss = r.losing_openings.length ? r.losing_openings[0][1] : 0;
 
@@ -570,7 +588,7 @@ function renderReport(r) {
       }).join("") +
       (r.time_trouble && r.time_trouble.count > 0
         ? '<div class="weak-time">⏱ ' + r.time_trouble.pct + "% of your mistakes (" + r.time_trouble.count +
-          ") came with under 30s on the clock — play the opening faster to save time for the moments that decide the game.</div>"
+          ") came with under 60s on the clock — play the opening faster to save time for the moments that decide the game.</div>"
         : "") +
       "</div>";
   }
@@ -594,7 +612,16 @@ function renderReport(r) {
   }
 
   const phaseRows = r.phase_breakdown.length
-    ? barRows(r.phase_breakdown, maxPhase, "", "mistakes")
+    ? r.phase_breakdown.map((p) => {
+        const pct = maxPhase ? (p.count / maxPhase) * 100 : 0;
+        const tt = (r.has_clock && p.time_trouble > 0)
+          ? '<div class="tt-sub">⏱ ' + p.time_trouble + " of " + p.count + " came with under 60s on the clock</div>"
+          : "";
+        return '<div class="phase-row"><div class="rowline">' +
+          '<div class="lbl">' + esc(p.phase) + "</div>" +
+          '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%"></div></div>' +
+          '<div class="count">' + p.count + " mistakes</div></div>" + tt + "</div>";
+      }).join("")
     : '<div class="empty">No mistakes flagged — clean games. ♟️</div>';
 
   let openingVisualHtml = "";
