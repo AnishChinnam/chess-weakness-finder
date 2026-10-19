@@ -3,7 +3,14 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Chess Weakness Finder</title>
+    <title>Chess Weakness Finder — find the mistakes you keep making</title>
+    <meta name="description" content="Free tool that runs Stockfish on your recent Lichess or Chess.com games and shows your recurring weaknesses: hanging pieces, missed tactics, endgames, openings and time trouble.">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Chess Weakness Finder">
+    <meta property="og:description" content="Find the mistakes you keep making. Free Stockfish analysis of your recent Lichess or Chess.com games.">
+    <meta name="twitter:card" content="summary">
+    <meta name="theme-color" content="#0e1117">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♞</text></svg>">
     <style>
         :root {
             --bg: #0e1117; --panel: #161b22; --panel-2: #1c2230; --border: #2a3140;
@@ -67,8 +74,8 @@
         .progress-text { color: var(--muted); font-size: 14px; }
 
         /* --- Report --- */
-        a.back { color: var(--accent); text-decoration: none; font-size: 14px; cursor: pointer; }
-        a.back:hover { text-decoration: underline; }
+        .back { background: none; border: 0; padding: 0; font: inherit; color: var(--accent); text-decoration: none; font-size: 14px; cursor: pointer; }
+        .back:hover { text-decoration: underline; }
         .rheader { margin: 18px 0 28px; }
         h1.rtitle { font-size: 30px; }
         .rtitle .name { background: linear-gradient(90deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
@@ -126,9 +133,26 @@
         .legend .sw { display: inline-block; width: 22px; height: 3px; border-radius: 2px; vertical-align: middle; margin: 0 4px 0 12px; }
         .empty { color: var(--muted); padding: 14px 0; }
         .error { background: linear-gradient(180deg, var(--panel), var(--panel-2)); border: 1px solid var(--bad); border-radius: 14px; padding: 24px; color: var(--bad); max-width: 520px; margin: 20px auto; }
-        .footer { margin-top: 32px; }
+        .footer { margin-top: 32px; display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; align-items: center; }
+        .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: -12px 0 8px; }
+        .action { font: inherit; font-size: 13px; font-weight: 600; color: var(--text); cursor: pointer; padding: 8px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel); transition: border-color .15s, background .15s; }
+        .action:hover { border-color: var(--accent); background: rgba(124,156,255,0.1); }
+        .signup { margin-top: 18px; padding: 18px 20px; border-radius: 14px; border: 1px solid rgba(92,224,198,0.35); background: rgba(92,224,198,0.07); }
+        .signup-pitch { font-size: 14px; line-height: 1.5; margin-bottom: 12px; }
+        .signup-row { display: flex; gap: 10px; }
+        .signup input[type=email] { flex: 1; min-width: 0; padding: 11px 14px; font-size: 15px; color: var(--text); background: #0d1117; border: 1px solid var(--border); border-radius: 10px; outline: none; }
+        .signup input[type=email]:focus { border-color: var(--accent); }
+        button.cta.small { width: auto; margin: 0; padding: 11px 18px; font-size: 14px; }
+        .tip { color: var(--warn); font-size: 14px; text-decoration: none; }
+        .tip:hover { text-decoration: underline; }
+        .site-footer { color: var(--muted); font-size: 12px; text-align: center; margin-top: 48px; line-height: 1.6; }
+        .site-footer a { color: var(--muted); }
         .hidden { display: none; }
         @media (max-width: 560px) {
+            body { padding: 24px 16px 48px; }
+            .card { padding: 28px 20px; }
+            .signup-row { flex-direction: column; }
+            button.cta.small { width: 100%; }
             .tiles { grid-template-columns: 1fr; }
             .mistakes-grid { grid-template-columns: 1fr; }
             .rowline .lbl, .rowline .lbl.wide { flex-basis: 120px; }
@@ -191,13 +215,20 @@
         <!-- PROGRESS -->
         <div id="progress" class="progress-box hidden">
             <div class="brand" style="justify-content:center"><span class="piece">♞</span><h1>Analyzing…</h1></div>
-            <div class="bar-outer"><div class="bar-inner" id="bar"></div></div>
+            <div class="bar-outer" id="bar-outer" role="progressbar" aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="bar-inner" id="bar"></div></div>
             <div class="progress-text" id="progress-text">Starting engine…</div>
-            <p class="note"><a class="back" id="cancel">Cancel</a></p>
+            <p class="note"><button type="button" class="back" id="cancel">Cancel</button></p>
         </div>
 
         <!-- RESULTS -->
         <div id="results" class="hidden"></div>
+
+        <footer class="site-footer">
+            Games are fetched from the public Lichess and Chess.com APIs and analyzed on your device; nothing is sent to our servers.<br>
+            Powered by <a href="https://github.com/niklasf/stockfish.js" target="_blank" rel="noopener">Stockfish.js</a> (GPLv3) and
+            <a href="https://github.com/jhlywa/chess.js" target="_blank" rel="noopener">chess.js</a>. Not affiliated with Lichess or Chess.com.
+            Some training links may be affiliate links.
+        </footer>
     </div>
 
     <script type="module" src="app.js"></script>

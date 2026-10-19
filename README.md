@@ -6,65 +6,52 @@ mistakes actually happen — by game phase and by opening. Pick a site
 username, and the app pulls their recent blitz games, runs each move through the
 Stockfish engine, and produces a weakness report.
 
-Built with Python, FastAPI, and the Stockfish chess engine.
+Stockfish runs **in the visitor's browser** (`static/`), so the site is pure
+static files: no server, no hosting bill, and it scales for free.
+(`app.py` is the original server-side FastAPI version, kept for reference.)
 
 ## What it does
 
-- Fetches a player's recent blitz **and rapid** games from the Lichess or
-  Chess.com public API (choose 5, 25, 50, or 100 games)
-- Evaluates every move with Stockfish to detect **mistakes** (large eval swings)
-  and **inaccuracies** (smaller ones)
-- Aggregates the results into a report:
-  - Total mistakes and inaccuracies, and average per game
-  - Which **phase** (opening / middlegame / endgame) mistakes cluster in
-  - Which **openings** produce the most mistakes
-  - Which **openings** the player loses in most
-  - **Board diagrams of the biggest mistakes** — each position is shown with an
-    arrow for the move played (red) vs. the engine's best move (green), plus the
-    eval before and after
-
-## Tech stack
-
-- **Python 3**
-- **FastAPI** — web framework
-- **python-chess** — PGN parsing and Stockfish engine communication
-- **Stockfish** — chess engine that evaluates each position
-- **Jinja2** — HTML templates
-
-## How it works
-
-1. `app.py` calls the Lichess API (or, for Chess.com, walks the player's monthly
-   game archives) to download recent blitz games as PGN.
-2. Each game is replayed move by move on a `chess.Board`.
-3. After each move, Stockfish evaluates the position (in centipawns).
-4. If the evaluation swings against the player by more than a threshold, the
-   move is flagged as a mistake or inaccuracy.
-5. Flags are grouped by game phase and opening to build the final report.
+- Fetches a player's recent blitz and/or rapid games from the Lichess or
+  Chess.com public API (5–100 games)
+- Evaluates every move with Stockfish and flags **mistakes** and
+  **inaccuracies** by how much they cut the player's winning chances (the same
+  model Lichess uses), so slips in already-won or already-lost positions don't
+  inflate the count
+- Builds a report:
+  - The player's **top 3 recurring weaknesses** (hanging pieces, missed
+    tactics, endgame technique, opening mistakes, positional slips), each with
+    a tip and a training link
+  - How many mistakes came in **time trouble**, per game phase
+  - **Board diagrams of the biggest mistakes** (move played vs. engine's best)
+  - Which **openings** produce the most mistakes and losses
+- **Sharing:** every report has a link that re-runs it (`?u=name&site=lichess`)
+  and a 1200×630 summary image for social posts
 
 ## Running it locally
 
-**Prerequisites:** Python 3 and Stockfish installed and on your `PATH`.
-
 ```bash
-# macOS
-brew install stockfish
+npm start            # serves static/ at http://127.0.0.1:8000
+npm test             # unit tests (Node 18+, no dependencies)
 ```
 
-```bash
-# Set up the project
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+## Deploying (free)
 
-# Start the server
-uvicorn app:app --reload
-```
+Any static host works. With **Cloudflare Pages** (free, works with private repos):
+connect the GitHub repo, leave the build command empty, set the output
+directory to `static`. Then set `siteUrl` in `static/config.js` to the live URL.
 
-Then open http://127.0.0.1:8000, pick a site, and enter a username.
+## Monetization settings
 
-> Stockfish evaluates every position, so analysis takes ~30–60 seconds for 5
-> games and a few minutes for 100. Larger batches automatically use a shorter
-> per-move analysis time to keep the total runtime reasonable.
+Everything revenue-related lives in `static/config.js`, and each feature stays
+hidden until it's filled in:
+
+| Setting | What it does |
+| --- | --- |
+| `resources` | Training link under each weakness — swap in affiliate URLs |
+| `tipUrl` | "Support the project" link in the report footer (Ko-fi, Buy Me a Coffee…) |
+| `newsletter.formAction` | Email signup under the weaknesses (e.g. Buttondown embed URL) |
+| `plausibleDomain` | Privacy-friendly analytics, with events for analyses, shares, signups and affiliate clicks |
 
 ## Notes
 
@@ -75,8 +62,8 @@ Then open http://127.0.0.1:8000, pick a site, and enter a username.
   monthly archives newest-first until it has enough blitz games.
 - Opening names come from the PGN `Opening` header (Lichess) or are derived from
   the `ECOUrl` header (Chess.com).
-- To analyze more games or other time controls, adjust `num_games` and the
-  time-control filter in `app.py`.
+- Lichess rejects requests with some automated User-Agents (curl, headless
+  Chrome). Normal browsers are fine.
 
 ## Roadmap / ideas
 
@@ -86,3 +73,4 @@ Then open http://127.0.0.1:8000, pick a site, and enter a username.
 - ~~Show the specific positions where mistakes happened~~ ✅ done (board diagrams)
 - Compare two players side by side
 - Cache results so repeat lookups are instant
+- Track a player's weaknesses over time (re-check monthly)

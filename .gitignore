@@ -14,3 +14,6 @@ anish
 SoccerScores
 SoccerScores.cpp
 SoccerScores.dSYM/
+
+# macOS
+.DS_Store
