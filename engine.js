@@ -42,6 +42,8 @@ export class Engine {
       const score = line.match(/^info .*\bscore (cp|mate) (-?\d+)/);
       // Bounds are not exact evaluations and must not replace the last score.
       if (score && !/\b(lowerbound|upperbound)\b/.test(line)) {
+        p.depth = Number(line.match(/\bdepth (\d+)/)?.[1] || 0);
+        p.pv = line.match(/\bpv (.+)$/)?.[1]?.trim().split(/\s+/) || [];
         p.cp = score[1] === 'cp' ? Number(score[2]) : null;
         p.mate = score[1] === 'mate' ? Number(score[2]) : null;
       }
@@ -49,17 +51,21 @@ export class Engine {
         const move = line.trim().split(/\s+/)[1];
         const stm = p.mate !== null ? (p.mate > 0 ? 10000 - p.mate : -10000 - p.mate) : p.cp;
         if (stm === null) { this.quit(new Error('Stockfish returned no evaluation. Please retry.')); continue; }
-        this.finish({ whiteCp: this.turn === 'w' ? stm : -stm, bestUci: /^(?:[a-h][1-8]){2}[qrbn]?$/.test(move) ? move : null });
+        const result = { whiteCp: this.turn === 'w' ? stm : -stm, bestUci: /^(?:[a-h][1-8]){2}[qrbn]?$/.test(move) ? move : null };
+        if (p.details) Object.assign(result, {depth:p.depth || 0, pv:p.pv || [], whiteMate:p.mate === null ? null : (this.turn === 'w' ? p.mate : -p.mate)});
+        this.finish(result);
       }
     }
   }
   init() { return this.wait('init', this.startupTimeout, ['uci']); }
   newGame() { this.worker.postMessage('ucinewgame\n'); }
-  analyse(fen, movetime) {
+  analyse(fen, movetime, { nodes = 5000, details = false } = {}) {
     this.turn = fen.split(' ')[1];
     // Browser throttling can make a short search take much longer in wall time.
     // Bound both work and time; a slow search must still fail rather than invent a score.
-    return this.wait('search', movetime + 30000, ['position fen ' + fen, 'go movetime ' + movetime + ' nodes 5000']);
+    const promise = this.wait('search', movetime + 30000, ['position fen ' + fen, 'go movetime ' + movetime + ' nodes ' + nodes]);
+    if (this.pending) this.pending.details = details;
+    return promise;
   }
   quit(error = new DOMException('Analysis stopped', 'AbortError')) {
     if (this.closed) return;
