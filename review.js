@@ -1,28 +1,34 @@
 import { Chess } from './vendor/chess.js';
-import { Engine } from './engine.js?v=20261022-review1';
-import { renderBoardSvg, fetchChesscom, fetchLichess } from './app.js?v=20261022-review1';
-import { reviewGame, parseGame, STARTER_PGN, chances, evaluationText, feedback, principalLine, moveFromUci } from './review-core.js';
+import { Engine } from './engine.js?v=20261022-overlay1';
+import { fetchChesscom, fetchLichess } from './app.js?v=20261022-overlay1';
+import { reviewGame, parseGame, STARTER_PGN, chances, evaluationText, feedback, principalLine, moveFromUci } from './review-core.js?v=20261022-overlay1';
+import {BOARD_THEMES,LABELS,DEFAULT_APPEARANCE,loadAppearance,saveAppearance,reviewBoard} from './appearance.js?v=20261022-overlay1';
 
 const $=id=>document.getElementById(id);
 const esc=text=>String(text).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let report=null, cursor=0, whiteBottom=true, controller=null, fetching=null, imported=[], variation=null, variationMoves=[], selected=null, variationEngine=null, variationController=null, variationRequest=0;
+let beforeMode=false,appearance;
+try{appearance=loadAppearance(window.localStorage);}catch{appearance={...DEFAULT_APPEARANCE};}
+function selectTab(name){for(const key of ['overview','review','analysis']){$('pane-'+key).hidden=key!==name;$('tab-'+key).setAttribute('aria-selected',String(key===name));}}
 const error=message=>{$('review-error').textContent=message;$('review-error').hidden=!message;};
 function stopVariation(){variationRequest++;variationController?.abort();variationController=null;variationEngine?.quit();variationEngine=null;$('evaluate-variation').disabled=false;}
 function busy(value){document.querySelectorAll('.import-panel button,.import-panel input,.import-panel textarea,.import-panel select').forEach(el=>el.disabled=value);}
 function resetVariation(){stopVariation();variation=null;variationMoves=[];selected=null;$('variation-status').textContent='';}
-function shownBoard(){return variation||new Chess(report.positions[cursor].fen);}
+function shownBoard(){return variation||new Chess(report.positions[beforeMode&&cursor>0?cursor-1:cursor].fen);}
 function drawBoard(position=report.positions[cursor]){
-  const board=shownBoard(), arrows=[];
-  if(!variation&&position.bestUci)arrows.push({from:position.bestUci.slice(0,2),to:position.bestUci.slice(2,4),color:'#57ab5a'});
-  let svg=renderBoardSvg(board.fen(),whiteBottom,arrows);
-  let hitboxes='';
-  for(let y=0;y<8;y++)for(let x=0;x<8;x++){
-    const square=String.fromCharCode(97+(whiteBottom?x:7-x))+(whiteBottom?8-y:y+1);
-    hitboxes+=`<rect data-square="${square}" x="${x*40}" y="${y*40}" width="40" height="40" fill="${selected===square?'#f4d66a':'transparent'}" fill-opacity="${selected===square?'.3':'0'}"/>`;
+  const board=shownBoard(), arrows=[],move=variation?null:report.moves[cursor-1];
+  if(move)arrows.push({from:move.from,to:move.to,color:LABELS[move.label]?.color||'#7f9c59'});
+  const best=beforeMode&&move?move.bestUci:!move?position.bestUci:null;
+  if(!variation&&best)arrows.push({from:best.slice(0,2),to:best.slice(2,4),color:'#84b84d'});
+  const legalSquares=selected?board.moves({verbose:true}).filter(m=>m.from===selected).map(m=>m.to):[];
+  $('review-board').innerHTML=reviewBoard(board.fen(),{appearance,whiteBottom,move,selected,legal:legalSquares,arrows,before:beforeMode});
+  const top=whiteBottom?'b':'w',bottom=whiteBottom?'w':'b';
+  for(const [place,color] of [['top',top],['bottom',bottom]]){
+    $(place+'-player').textContent=report.summary[color].name;
+    $(place+'-rating').textContent=report.header[color==='w'?'WhiteElo':'BlackElo']||'';
+    $(place+'-result').textContent=report.header.Result||'';
   }
-  $('review-board').innerHTML=svg.replace('</svg>',hitboxes+'</svg>');
-  $('review-board').querySelector('svg').setAttribute('role','img');
-  $('review-board').querySelector('svg').setAttribute('aria-label',`Chess board, ${board.turn()==='w'?'White':'Black'} to move. Use the legal move selector to explore.`);
+  $('board-legend').innerHTML=move?`<span class="legend-dot" style="background:${LABELS[move.label]?.color}"></span><strong>${esc(move.label)}</strong><span>${esc(move.san)}${beforeMode?' · before move':''}</span>`:'<span>Initial position · choose a move or Start review</span>';
   const legal=board.game_over()?[]:board.moves({verbose:true});
   $('legal-move').innerHTML=legal.length?legal.map(m=>`<option value="${esc(m.san)}">${esc(m.san)}</option>`).join(''):'<option>No legal moves</option>';
   $('play-variation').disabled=!legal.length;$('evaluate-variation').disabled=board.game_over();
@@ -35,7 +41,7 @@ function graph(){
   $('eval-graph').innerHTML=`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Game evaluation graph"><rect width="${w}" height="${h}" fill="#0d131e" rx="5"/><line x1="0" y1="55" x2="460" y2="55" stroke="#394b60" stroke-dasharray="3 4"/><polyline points="${points}" fill="none" stroke="#5ce0c6" stroke-width="2"/><line x1="${pad+(w-2*pad)*cursor/n}" x2="${pad+(w-2*pad)*cursor/n}" y1="0" y2="110" stroke="#d8e4f5"/></svg>`;
 }
 function showPosition(index){
-  resetVariation();cursor=Math.max(0,Math.min(report.moves.length,index));const position=report.positions[cursor], move=report.moves[cursor-1];
+  resetVariation();beforeMode=false;$('before-move').checked=false;cursor=Math.max(0,Math.min(report.moves.length,index));const position=report.positions[cursor], move=report.moves[cursor-1];
   drawBoard();setEval(position);
   $('position-label').textContent=`Position ${cursor} / ${report.moves.length} · ${new Chess(position.fen).turn()==='w'?'White':'Black'} to move`;
   $('move-heading').textContent=move?`${move.number}${move.color==='w'?'.':'…'} ${move.san}`:'Initial position';
@@ -55,17 +61,18 @@ function showPosition(index){
 function render(){
   $('game-title').textContent=`${report.summary.w.name} vs ${report.summary.b.name}`;
   $('game-details').textContent=[report.header.Event,report.header.Date,report.header.Result,report.mode==='deeper'?'Deeper search':'Quick search',`${report.moves.length} half-moves`].filter(Boolean).join(' · ');
-  $('player-summary').innerHTML=['w','b'].map(c=>{const s=report.summary[c];return `<article class="player-card"><h3>${c==='w'?'♔ White':'♚ Black'} · ${esc(s.name)}</h3><strong>${s.accuracy===null?'—':s.accuracy.toFixed(1)}</strong> <small>accuracy estimate / 100</small><div class="counts">${['Best','Excellent','Good','Inaccuracy','Mistake','Blunder'].map(k=>`<span class="label-${k.toLowerCase()}">${k}: ${s.counts[k]||0}</span>`).join('')}</div></article>`;}).join('');
+  $('player-summary').innerHTML=['w','b'].map(c=>{const s=report.summary[c];return `<article class="player-card"><h3>${c==='w'?'♔ White':'♚ Black'} · ${esc(s.name)}</h3><strong>${s.accuracy===null?'—':s.accuracy.toFixed(1)}</strong> <small>accuracy estimate / 100</small></article>`;}).join('');
+  $('classification-summary').innerHTML=Object.entries(LABELS).map(([name,meta])=>`<div class="classification-row"><strong>${report.summary.w.counts[name]||0}</strong><span><i style="background:${meta.color}">${meta.symbol}</i>${name}</span><strong>${report.summary.b.counts[name]||0}</strong></div>`).join('');
   // A FEN can begin with Black to move; keep the first cell blank in that case.
   $('move-list').innerHTML=(report.moves[0].color==='b'?'<span></span>':'')+report.moves.map((m,i)=>`<button type="button" data-ply="${i+1}" aria-label="Move ${m.number} ${m.color==='w'?'White':'Black'} ${esc(m.san)}, ${m.label}"><span>${m.number}${m.color==='w'?'.':'…'} ${esc(m.san)}</span><small class="label-${m.label.toLowerCase()}">${m.label}</small></button>`).join('');
-  $('move-slider').max=report.moves.length;$('review-output').hidden=false;showPosition(0);
+  $('move-slider').max=report.moves.length;$('review-output').hidden=false;document.body.classList.add('reviewing');selectTab('overview');showPosition(0);
   $('review-output').scrollIntoView({behavior:'smooth',block:'start'});
 }
 async function start(pgn){
   if(controller||fetching)return;
   error('');resetVariation();
   try{parseGame(pgn);}catch(e){error(e.message);return;}
-  const run=new AbortController();controller=run;busy(true);$('review-progress').hidden=false;$('review-output').hidden=true;$('review-bar').value=0;$('review-progress-text').textContent='Starting Stockfish…';
+  const run=new AbortController();controller=run;busy(true);$('review-progress').hidden=false;$('review-output').hidden=true;document.body.classList.remove('reviewing');$('review-bar').value=0;$('review-progress-text').textContent='Starting Stockfish…';
   try{
     const next=await reviewGame(pgn,{signal:run.signal,mode:$('search-mode').value,onProgress:(fraction,text)=>{if(controller!==run)return;$('review-bar').value=Math.round(fraction*100);$('review-progress-text').textContent=text+' · '+Math.round(fraction*100)+'%';}});
     if(controller!==run)return;report=next;whiteBottom=true;render();
@@ -90,16 +97,16 @@ $('recent-form').onsubmit=async e=>{
 };
 $('review-selected').onclick=()=>{const game=imported[Number($('game-choice').value)];if(game)start(game.pgn);};
 $('review-cancel').onclick=()=>{controller?.abort();$('review-progress-text').textContent='Cancelling…';};
-$('new-review').onclick=()=>{resetVariation();$('review-output').hidden=true;document.querySelector('.import-panel').scrollIntoView({behavior:'smooth'});};
-$('first-move').onclick=()=>showPosition(0);$('prev-move').onclick=()=>showPosition(cursor-1);$('next-move').onclick=()=>showPosition(cursor+1);$('last-move').onclick=()=>showPosition(report.moves.length);
+$('new-review').onclick=()=>{resetVariation();document.body.classList.remove('reviewing');$('review-output').hidden=true;document.querySelector('.import-panel').scrollIntoView({behavior:'smooth'});};
+$('first-move').onclick=()=>showPosition(0);$('prev-move').onclick=()=>showPosition(cursor-1);$('next-move').onclick=()=>{selectTab('review');showPosition(cursor+1)};$('last-move').onclick=()=>showPosition(report.moves.length);
 $('flip-board').onclick=()=>{whiteBottom=!whiteBottom;drawBoard();};
 $('move-slider').oninput=e=>showPosition(Number(e.target.value));
-$('move-list').onclick=e=>{const button=e.target.closest('[data-ply]');if(button)showPosition(Number(button.dataset.ply));};
+$('move-list').onclick=e=>{const button=e.target.closest('[data-ply]');if(button){selectTab('review');showPosition(Number(button.dataset.ply));}};
 $('next-mistake').onclick=()=>{const candidates=report.moves.map((m,i)=>m.loss>=5?i+1:null).filter(Boolean);const next=candidates.find(i=>i>cursor)??candidates[0];if(next!==undefined)showPosition(next);else $('move-feedback').textContent='No inaccuracies, mistakes or blunders were found in this search.';};
 $('eval-graph').onclick=e=>{const bounds=$('eval-graph').getBoundingClientRect();showPosition(Math.round(Math.max(0,Math.min(1,(e.clientX-bounds.left)/bounds.width))*report.moves.length));};
 document.addEventListener('keydown',e=>{if(!report||$('review-output').hidden||['INPUT','SELECT','TEXTAREA','BUTTON'].includes(e.target.tagName)||e.metaKey||e.ctrlKey||e.altKey)return;if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();showPosition(cursor+(e.key==='ArrowRight'?1:-1));}});
 function playMove(san){
-  stopVariation();if(!variation)variation=new Chess(report.positions[cursor].fen);
+  stopVariation();if(!variation)variation=new Chess(shownBoard().fen());selectTab('analysis');
   const move=variation.move(san);if(!move)return;variationMoves.push(move.san);selected=null;drawBoard();$('position-eval').textContent='Variation · not evaluated';$('position-label').textContent=variation.turn()==='w'?'White to move':'Black to move';$('variation-status').textContent='Choose Analyze this position for a fresh engine score.';
 }
 $('play-variation').onclick=()=>playMove($('legal-move').value);
@@ -119,3 +126,21 @@ $('evaluate-variation').onclick=async()=>{
 };
 $('download-review').onclick=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='chess-game-review.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
 if('serviceWorker' in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
+$('before-move').onchange=e=>{resetVariation();beforeMode=e.target.checked;drawBoard();const p=report.positions[beforeMode&&cursor>0?cursor-1:cursor];setEval(p);$('position-label').textContent=(beforeMode?'Before':'After')+' move '+cursor;};
+for(const button of document.querySelectorAll('[data-tab]'))button.onclick=()=>selectTab(button.dataset.tab);
+$('start-review').onclick=()=>{selectTab('review');showPosition(Math.min(1,report.moves.length));};
+function applyAppearance(persist=false){
+  document.body.dataset.surface=appearance.surface;
+  $('board-theme').value=appearance.board;$('piece-theme').value=appearance.pieces;$('surface-theme').value=appearance.surface;
+  for(const [key,id] of [['badges','show-badges'],['arrows','show-arrows'],['coordinates','show-coordinates'],['highlights','show-highlights']])$(id).checked=appearance[key];
+  const demo=new Chess();demo.move('e4');
+  $('appearance-preview').innerHTML=reviewBoard(demo.fen(),{appearance,move:{from:'e2',to:'e4',san:'e4',label:'Brilliant'},arrows:[{from:'e2',to:'e4',color:LABELS.Brilliant.color}]});
+  if(report&&!$('review-output').hidden)drawBoard();
+  if(persist){let saved=false;try{saved=saveAppearance(window.localStorage,appearance);}catch{}$('appearance-status').textContent=saved?'Appearance saved on this device.':'Applied for this visit. Browser storage is unavailable.';}
+}
+$('appearance-open').onclick=()=>$('appearance-dialog').showModal();$('appearance-close').onclick=()=>$('appearance-dialog').close();
+for(const [id,key] of [['board-theme','board'],['piece-theme','pieces'],['surface-theme','surface']])$(id).onchange=e=>{appearance[key]=e.target.value;applyAppearance(true);};
+for(const [id,key] of [['show-badges','badges'],['show-arrows','arrows'],['show-coordinates','coordinates'],['show-highlights','highlights']])$(id).onchange=e=>{appearance[key]=e.target.checked;applyAppearance(true);};
+$('appearance-reset').onclick=()=>{appearance={...DEFAULT_APPEARANCE};applyAppearance(true);};
+applyAppearance();
