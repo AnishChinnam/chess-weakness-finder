@@ -36,7 +36,7 @@ export function classifyMove(before, after, move) {
 export function terminalScore(board) {
   return {whiteCp:board.in_checkmate()?(board.turn()==='w'?-10000:10000):0,bestUci:null,depth:0,pv:[],whiteMate:board.in_checkmate()?0:null,terminal:board.in_checkmate()?'Checkmate':'Draw'};
 }
-export async function reviewGame(pgn,{signal,onProgress=()=>{},mode='quick',engineFactory=s=>new Engine(s)}={}) {
+export async function reviewGame(pgn,{signal,onProgress=()=>{},mode='deeper',engineFactory=s=>new Engine(s)}={}) {
   const parsed=parseGame(pgn), board=new Chess(parsed.initialFen), search=SEARCH[mode]||SEARCH.quick;
   const engine=engineFactory(signal), positions=[], moves=[];
   const abort=()=>{if(signal?.aborted)throw new DOMException('Review cancelled','AbortError');};
