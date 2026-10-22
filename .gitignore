@@ -19,3 +19,4 @@ SoccerScores.dSYM/
 .DS_Store
 tmp/
 output/
+dist/
