@@ -804,7 +804,7 @@ async function run(params) {
   } finally { if (activeRun === controller) activeRun = null; }
 }
 
-if (typeof document !== "undefined") {
+if (typeof document !== "undefined" && document.getElementById("form")) {
   if (CONFIG.plausibleDomain) {
     window.plausible = window.plausible || function () { (window.plausible.q = window.plausible.q || []).push(arguments); };
     const s = document.createElement("script");

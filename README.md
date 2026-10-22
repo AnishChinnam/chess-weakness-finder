@@ -95,3 +95,23 @@ Search metadata, canonical URLs, and `sitemap.xml` are included. Submit
 Search engines decide whether and when to index the site; deployment does not
 guarantee search placement. A project-level robots.txt cannot control the
 root github.io origin, so no restrictive robots rules are added.
+
+## Free game review
+
+Open [Game Review](https://anishchinnam.github.io/chess-weakness-finder/review.html).
+Import a single PGN (paste or file) or select a recent public Lichess/Chess.com
+blitz/rapid game. Stockfish evaluates both players and supplies move labels,
+an evaluation graph, principal variations and accuracy estimates. Navigate
+with the move list, graph, slider or arrow controls; flip the board, try legal
+variations, and request a fresh evaluation. Review data downloads as JSON.
+
+There is no account requirement or daily review quota. All computation is
+client-side. Quick/deeper search budgets are bounded by both time and nodes.
+The score is our own documented mean exponential winning-chance-loss estimate,
+not Chess.com's CAPS2 score, rating estimate or proprietary classification.
+No synthetic Brilliant/Book classifications or fabricated coaching are shown.
+Move labels and short-search evaluations can change with more engine time.
+
+Run `npm test` for PGN validation, both-color scoring, custom FEN numbering,
+mate handling, legal PV conversion, engine details, cancellation and cleanup,
+plus the existing weakness-report regression suite.
