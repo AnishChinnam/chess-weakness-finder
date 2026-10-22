@@ -82,3 +82,16 @@ hidden until it's filled in:
 - Compare two players side by side
 - Cache results so repeat lookups are instant
 - Track a player's weaknesses over time (re-check monthly)
+
+## Public website and deployment
+
+The standalone website is configured for https://anishchinnam.github.io/chess-weakness-finder/ (GitHub Pages).
+Run `npm test` and `npm run build`; publish the contents of `dist/` to the
+`gh-pages` branch and enable Pages with that branch and the root directory.
+The app uses relative asset URLs and runs Stockfish in the browser.
+
+Search metadata, canonical URLs, and `sitemap.xml` are included. Submit
+`https://anishchinnam.github.io/chess-weakness-finder/sitemap.xml` in Google Search Console after verifying ownership.
+Search engines decide whether and when to index the site; deployment does not
+guarantee search placement. A project-level robots.txt cannot control the
+root github.io origin, so no restrictive robots rules are added.

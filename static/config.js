@@ -3,7 +3,7 @@
 export const CONFIG = {
   // Public URL of the deployed site, used for share links (e.g. "https://chessweakness.com/").
   // Leave empty to use whatever URL the page was loaded from.
-  siteUrl: "",
+  siteUrl: "https://anishchinnam.github.io/chess-weakness-finder/",
 
   // "Buy me a coffee" style tip link (Ko-fi, Buy Me a Coffee, GitHub Sponsors, Stripe Payment Link…).
   tipUrl: "https://paypal.me/bhanuchinnam",
