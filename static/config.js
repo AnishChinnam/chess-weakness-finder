@@ -6,8 +6,8 @@ export const CONFIG = {
   siteUrl: "",
 
   // "Buy me a coffee" style tip link (Ko-fi, Buy Me a Coffee, GitHub Sponsors, Stripe Payment Link…).
-  tipUrl: "",
-  tipLabel: "Leave a tip",
+  tipUrl: "https://paypal.me/bhanuchinnam",
+  tipLabel: "Support this project via PayPal",
 
   // Sell the included training journal through a real digital-download shop.
   // The button is hidden until the HTTPS checkout URL is configured.
