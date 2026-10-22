@@ -41,7 +41,10 @@ function showPosition(index){
   $('move-heading').textContent=move?`${move.number}${move.color==='w'?'.':'…'} ${move.san}`:'Initial position';
   $('move-class').textContent=move?.label||'Start';$('move-class').className='pill label-'+(move?.label||'good').toLowerCase();
   $('move-feedback').textContent=feedback(move);
-  const line=principalLine(position.fen,position.pv);
+  const linePosition=report.positions[move?cursor-1:cursor];
+  const line=principalLine(linePosition.fen,linePosition.pv);
+  $('line-context').textContent=move?'ENGINE ALTERNATIVE BEFORE THIS MOVE':'ENGINE CONTINUATION';
+  $('show-best').textContent=move?'Compare engine line':'Play engine line';
   $('best-line').textContent=line.length?line.join(' '):position.terminal||'No continuation available from this search.';
   $('show-best').disabled=!line.length;$('move-slider').value=cursor;
   $('first-move').disabled=$('prev-move').disabled=cursor===0;
@@ -103,9 +106,9 @@ $('play-variation').onclick=()=>playMove($('legal-move').value);
 $('review-board').onclick=e=>{const square=e.target.getAttribute('data-square');if(!square||!report)return;const board=shownBoard();if(selected){const matching=board.moves({verbose:true}).filter(m=>m.from===selected&&m.to===square);if(matching.length===1){playMove(matching[0].san);return;}if(matching.length>1){$('variation-status').textContent='Choose a promotion in the legal move selector, then Play move.';$('legal-move').value=matching.find(m=>m.promotion==='q').san;return;}}selected=board.get(square)?.color===board.turn()?square:null;drawBoard();};
 $('reset-variation').onclick=()=>showPosition(cursor);
 $('show-best').onclick=()=>{
-  resetVariation();const p=report.positions[cursor];variation=new Chess(p.fen);
+  resetVariation();const p=report.positions[cursor>0?cursor-1:cursor];variation=new Chess(p.fen);
   for(const text of (p.pv||[]).slice(0,6)){const move=moveFromUci(variation,text);if(!move)break;variationMoves.push(move.san);}
-  drawBoard();$('position-eval').textContent='Engine line · not evaluated';$('position-label').textContent=variation.turn()==='w'?'White to move':'Black to move';$('variation-status').textContent='Showing up to six moves of the engine continuation. Return to game to resume replay.';
+  drawBoard();$('position-eval').textContent='Engine line · not evaluated';$('position-label').textContent=variation.turn()==='w'?'White to move':'Black to move';$('variation-status').textContent='Showing up to six half-moves of the engine alternative from before the selected move (or the initial position). Return to game to resume replay.';
 };
 $('evaluate-variation').onclick=async()=>{
   if(!report||variationEngine)return;const board=shownBoard();if(board.game_over())return;
