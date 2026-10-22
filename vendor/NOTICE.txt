@@ -1,0 +1,20 @@
+THIRD-PARTY NOTICES
+
+Stockfish.js
+Copyright T. Romstad, M. Costalba, J. Kiiski, G. Linscott and other contributors.
+JavaScript compilation by Niklas Fiekas. Multi-variant support by Daniel Dugovic and contributors.
+Licensed under GNU GPL version 3. The original notice is retained in stockfish.js.
+Project and source: https://github.com/niklasf/stockfish.js
+License text: https://www.gnu.org/licenses/gpl-3.0.txt
+License included as COPYING-GPL-3.txt.
+Unmodified binaries from stockfish.js 10.0.2 on the npm registry.
+Corresponding source and build scripts included as stockfish-source-10.0.2.tar.gz.
+Upstream source commit: e105072e84cf8ee5dd5219e2c5be29c3b8bf8a5a
+https://github.com/lichess-org/stockfish.js/tree/e105072e84cf8ee5dd5219e2c5be29c3b8bf8a5a
+
+chess.js
+Copyright (c) 2022, Jeff Hlywa (jhlywa@gmail.com). All rights reserved.
+Licensed under BSD-2-Clause. The full license and disclaimer are retained at the top of chess.js.
+Project and source: https://github.com/jhlywa/chess.js
+
+These libraries are free software. Paid optional training journals and support payments do not change their licenses.
