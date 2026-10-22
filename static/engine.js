@@ -39,9 +39,14 @@ export class Engine {
       if (!p) continue;
       if (p.kind === 'init' && line.trim() === 'uciok') { this.finish(); continue; }
       if (p.kind !== 'search') continue;
+      const multipv = Number(line.match(/\bmultipv (\d+)/)?.[1] || 1);
       const score = line.match(/^info .*\bscore (cp|mate) (-?\d+)/);
       // Bounds are not exact evaluations and must not replace the last score.
       if (score && !/\b(lowerbound|upperbound)\b/.test(line)) {
+        const entry = {depth:Number(line.match(/\bdepth (\d+)/)?.[1] || 0), pv:line.match(/\bpv (.+)$/)?.[1]?.trim().split(/\s+/) || [], cp:score[1]==='cp'?Number(score[2]):null, mate:score[1]==='mate'?Number(score[2]):null};
+        if (!p.lines) p.lines = new Map();
+        p.lines.set(multipv, entry);
+        if (multipv !== 1) continue;
         p.depth = Number(line.match(/\bdepth (\d+)/)?.[1] || 0);
         p.pv = line.match(/\bpv (.+)$/)?.[1]?.trim().split(/\s+/) || [];
         p.cp = score[1] === 'cp' ? Number(score[2]) : null;
@@ -53,18 +58,20 @@ export class Engine {
         if (stm === null) { this.quit(new Error('Stockfish returned no evaluation. Please retry.')); continue; }
         const result = { whiteCp: this.turn === 'w' ? stm : -stm, bestUci: /^(?:[a-h][1-8]){2}[qrbn]?$/.test(move) ? move : null };
         if (p.details) Object.assign(result, {depth:p.depth || 0, pv:p.pv || [], whiteMate:p.mate === null ? null : (this.turn === 'w' ? p.mate : -p.mate)});
+        if (p.multiPv > 1) result.variations = [...(p.lines || [])].filter(([,v])=>v.depth===p.depth).map(([rank,v])=>({rank,depth:v.depth,pv:v.pv,whiteCp:(this.turn==='w'?1:-1)*(v.mate===null?v.cp:v.mate>0?10000-v.mate:-10000-v.mate)}));
         this.finish(result);
       }
     }
   }
   init() { return this.wait('init', this.startupTimeout, ['uci']); }
   newGame() { this.worker.postMessage('ucinewgame\n'); }
-  analyse(fen, movetime, { nodes = 5000, details = false } = {}) {
+  analyse(fen, movetime, { nodes = 5000, details = false, multiPv = 1 } = {}) {
     this.turn = fen.split(' ')[1];
     // Browser throttling can make a short search take much longer in wall time.
     // Bound both work and time; a slow search must still fail rather than invent a score.
+    this.worker.postMessage('setoption name MultiPV value ' + Math.max(1,Math.min(2,multiPv)) + '\n');
     const promise = this.wait('search', movetime + 30000, ['position fen ' + fen, 'go movetime ' + movetime + ' nodes ' + nodes]);
-    if (this.pending) this.pending.details = details;
+    if (this.pending) {this.pending.details = details;this.pending.multiPv = multiPv;}
     return promise;
   }
   quit(error = new DOMException('Analysis stopped', 'AbortError')) {

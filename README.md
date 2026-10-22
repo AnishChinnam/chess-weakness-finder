@@ -109,9 +109,27 @@ There is no account requirement or daily review quota. All computation is
 client-side. Quick/deeper search budgets are bounded by both time and nodes.
 The score is our own documented mean exponential winning-chance-loss estimate,
 not Chess.com's CAPS2 score, rating estimate or proprietary classification.
-No synthetic Brilliant/Book classifications or fabricated coaching are shown.
+Brilliant and Great are conservative estimates from sound sacrifice verification and same-depth MultiPV alternatives; no Book labels or rating estimates are invented.
 Move labels and short-search evaluations can change with more engine time.
 
 Run `npm test` for PGN validation, both-color scoring, custom FEN numbering,
 mate handling, legal PV conversion, engine details, cancellation and cleanup,
 plus the existing weakness-report regression suite.
+
+### Board overlays and appearance
+
+The review workspace keeps the board beside Overview, Review and Analysis tabs.
+Move badges (!!, !, star, checkmark, ?!, ?, ??), colored move squares and arrows
+follow the selected move and board orientation. Before move shows both the played
+move and the engine alternative. Variations never inherit game-review badges.
+Appearance offers six board palettes, three piece styles, three interface colors
+and individual overlay switches. Preferences are saved locally, with graceful
+fallback when storage is unavailable.
+
+Special labels are our estimates, not exact reproductions of Chess.com. Brilliant
+requires a near-best newly offered minor piece or more, a non-losing result, no
+already decisive advantage, and a separate search of a material-winning capture.
+Great requires the best move with multiple legal choices and a same-depth second
+line at depth 8+ that loses 10 winning-chance points. Classifications are documented
+in the page methodology and covered by regression tests. The names follow the
+[public Chess.com definitions](https://support.chess.com/en/articles/8572705-how-are-moves-classified-what-is-a-blunder-or-brilliant-etc); its rating-sensitive model is not claimed.

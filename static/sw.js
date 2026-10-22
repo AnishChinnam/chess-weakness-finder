@@ -1,5 +1,5 @@
-const CACHE='cwf-shell-v5';
-const ASSETS=['./review.html','./review.js','./review-core.js','./review.css','./','./index.html','./app.js','./product.js','./config.js','./engine.js','./product.css','./manifest.webmanifest','./icon-192.png','./icon-512.png','./vendor/chess.js','./vendor/stockfish.js','./vendor/stockfish.wasm.js','./vendor/stockfish.wasm','./privacy.html','./about.html','./info.css'];
+const CACHE='cwf-shell-v6';
+const ASSETS=['./appearance.js','./review.html','./review.js','./review-core.js','./review.css','./','./index.html','./app.js','./product.js','./config.js','./engine.js','./product.css','./manifest.webmanifest','./icon-192.png','./icon-512.png','./vendor/chess.js','./vendor/stockfish.js','./vendor/stockfish.wasm.js','./vendor/stockfish.wasm','./privacy.html','./about.html','./info.css'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('cwf-shell-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
