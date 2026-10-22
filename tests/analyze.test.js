@@ -89,10 +89,12 @@ test("Engine converts mate scores and ignores bound-only lines", async () => {
     workerFactory: () => (worker = { sent: [], postMessage(m) { this.sent.push(m); }, terminate() {} }),
   });
   const ready = engine.init();
+  assert.deepEqual(worker.sent, ['uci\n']);
   worker.onmessage({ data: "uciok" });
   await ready;
 
   const search = engine.analyse("8/8/8/8/8/8/8/K6k b - - 0 1", 100);
+  assert.ok(worker.sent.every(command => command.endsWith('\n')));
   worker.onmessage({ data: "info depth 5 score cp 50\ninfo depth 6 score cp 900 lowerbound\nbestmove h1g1" });
   assert.deepEqual(await search, { whiteCp: -50, bestUci: "h1g1" });
 

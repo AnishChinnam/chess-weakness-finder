@@ -1,6 +1,7 @@
 import { Chess } from "./vendor/chess.js";
-import { Engine } from "./engine.js";
+import { Engine } from "./engine.js?v=20261022d";
 import { CONFIG } from "./config.js";
+import { renderTrainingPlan, renderCommerce, printablePlan, readHistory, saveHistory, clearHistory, safeUrl } from "./product.js";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -66,7 +67,7 @@ function splitPgns(text) {
 
 async function fetchLichess(username, numGames, timeControl, signal) {
   const perf = TC_CLASSES[timeControl].join(",");
-  const params = new URLSearchParams({ max: String(numGames), perfType: perf, opening: "true" });
+  const params = new URLSearchParams({ max: String(numGames), perfType: perf, opening: "true", clocks: "true", evals: "false" });
   const url = "https://lichess.org/api/games/user/" + encodeURIComponent(username) + "?" + params;
   const res = await fetchRemote(url, { headers: { Accept: "application/x-chess-pgn" }, signal });
   if (res.status === 429) throw new Error("Lichess rate limit hit. Please wait a minute and try again.");
@@ -518,8 +519,8 @@ function renderReport(r) {
       '<div class="section weakness">' +
       r.weaknesses.map((w, i) => {
         const res = CONFIG.resources[w.key];
-        const link = res && res.url
-          ? '<a class="weak-link" data-event="Resource click" data-theme="' + w.key + '" href="' + esc(res.url) + '" target="_blank" rel="noopener sponsored">' + esc(res.label) + "</a>"
+        const link = res && safeUrl(res.url)
+          ? '<a class="weak-link" data-event="Resource click" data-theme="' + w.key + '" href="' + esc(safeUrl(res.url)) + '" target="_blank" rel="noopener' + (res.affiliate ? ' sponsored' : '') + '">' + esc(res.label) + (res.affiliate ? ' (affiliate link)' : '') + "</a>"
           : "";
         return '<div class="weak-row"><div class="weak-head">' +
           '<span class="weak-rank">#' + (i + 1) + "</span>" +
@@ -607,6 +608,7 @@ function renderReport(r) {
 
   return (
     '<a class="back" id="back">← Analyze another player</a>' +
+    (r.demo ? '<div class="demo-banner" role="status">SAMPLE REPORT · Illustrative data, not a real player’s results. <button type="button" class="back" id="demo-start">Find my weaknesses →</button></div>' : '') +
     '<div class="rheader"><h1 class="rtitle">Report for <span class="name">' + esc(r.username) + "</span></h1>" +
     '<div class="meta">' + r.games_analyzed + " recent " + r.time_control + " games" +
     '<span class="badge">' + r.site + "</span></div></div>" +
@@ -622,6 +624,8 @@ function renderReport(r) {
     '<button type="button" class="action" id="download-json">⬇ Download data</button>' +
     "</div>" +
     weaknessHtml +
+    renderTrainingPlan(r) +
+    renderCommerce(CONFIG) +
     newsletterHtml +
     mistakesHtml +
     "<h2>When mistakes happen</h2><div class=\"section\">" + phaseRows + "</div>" +
@@ -676,7 +680,7 @@ function renderShareImage(r, url) {
   x.fillStyle = accent; x.fillRect(0, 0, W, 8);
 
   x.fillStyle = "#8b949e"; x.font = font(600, 26);
-  x.fillText("♞ CHESS WEAKNESS FINDER", 64, 80);
+  x.fillText("♞ CHESS WEAKNESS FINDER" + (r.demo ? ' · ILLUSTRATIVE SAMPLE' : ''), 64, 80);
   x.fillStyle = "#e6edf3"; x.font = font(800, 58);
   x.fillText(r.username.length > 22 ? r.username.slice(0, 21) + "…" : r.username, 64, 160);
   x.fillStyle = "#8b949e"; x.font = font(400, 26);
@@ -714,6 +718,8 @@ function show(view) {
 }
 function goHome() {
   show("home"); $("results").innerHTML = ""; $("username").focus();
+  document.title = 'Chess Weakness Finder — find the mistakes you keep making';
+  renderRecent();
   if (location.search) history.replaceState(null, "", location.pathname);
 }
 function showError(msg) {
@@ -733,8 +739,14 @@ function saveBlob(blob, name) {
 }
 function bindReport() {
   for (const id of ["back", "back2"]) { if ($(id)) { $(id).href = "#"; $(id).onclick = e => { e.preventDefault(); goHome(); }; } }
-  const link = shareUrl(lastParams, CONFIG.siteUrl || location.href);
+  const base = CONFIG.siteUrl || location.href;
+  const link = lastReport.demo ? base.split(/[?#]/)[0] + '?demo=1' : shareUrl(lastParams, base);
   const slug = lastReport.username.replace(/[^\w-]/g, "_");
+  if ($("demo-start")) $("demo-start").onclick = goHome;
+  $("print-plan").onclick = () => {
+    track('Plan download');
+    saveBlob(new Blob([printablePlan(lastReport)], {type:'text/html'}),slug+'-7-day-plan.html');
+  };
   $("share-link").onclick = async e => {
     track("Share", { kind: "link" });
     try { await navigator.clipboard.writeText(link); flash(e.target, "✓ Link copied"); }
@@ -782,6 +794,7 @@ async function run(params) {
     const report = await analyze(params, hooks);
     if (activeRun !== controller) return;
     lastReport = report; lastParams = params;
+    try { saveHistory(window.localStorage, params, report); } catch {}
     $("results").innerHTML = renderReport(report);
     bindReport(); show("results"); window.scrollTo(0, 0);
     document.title = report.username + "'s chess weaknesses · Chess Weakness Finder";
@@ -813,11 +826,43 @@ if (typeof document !== "undefined") {
     const r = activeRun; activeRun = null; r?.abort(); goHome();
   });
 
+  $("demo").addEventListener('click', () => {
+    lastReport = demoReport();
+    lastParams = {username:'sample-player',site:'lichess',timeControl:'both',numGames:5};
+    $("results").innerHTML=renderReport(lastReport);
+    bindReport(); show('results'); window.scrollTo(0,0);
+    history.replaceState(null,'',location.pathname+'?demo=1');
+  });
+  $("clear-history").addEventListener('click',()=>{clearHistory(window.localStorage);renderRecent();});
+  renderRecent();
+  $("home-commerce").innerHTML=renderCommerce(CONFIG);
+  let installPrompt;
+  window.addEventListener('beforeinstallprompt', e=>{e.preventDefault();installPrompt=e;$("install").classList.remove('hidden');});
+  $("install").addEventListener('click',async()=>{if(installPrompt){await installPrompt.prompt();installPrompt=null;$("install").classList.add('hidden');}});
+  if('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(()=>{});
+
   // Shared links (?u=…&site=…) prefill the form and start right away.
   const shared = paramsFromQuery(location.search);
-  if (shared) {
+  if (new URLSearchParams(location.search).get('demo') === '1') {
+    $("demo").click();
+  } else if (shared) {
     $("username").value = shared.username; $("site").value = shared.site;
     $("time_control").value = shared.timeControl; $("num_games").value = String(shared.numGames);
     run(shared);
   }
+}
+
+function renderRecent() {
+  let items=[];
+  try {items=readHistory(window.localStorage);}catch{}
+  $("recent").classList.toggle('hidden',!items.length);
+  $("recent-list").innerHTML=items.map((x,i)=>`<button class="recent-item" type="button" data-index="${i}"><span><strong>${esc(x.username)}</strong><small>${SITE_NAMES[x.site]} · ${x.games} games · ${new Date(x.at).toLocaleDateString()}</small></span><span>${x.avg} <small>mistakes / game</small><span class="recent-run">Reanalyze →</span></span></button>`).join('');
+  $("recent-list").querySelectorAll('button').forEach(b=>b.onclick=()=>{const p=items[Number(b.dataset.index)];$("username").value=p.username;$("site").value=p.site;$("time_control").value=p.timeControl;$("num_games").value=String(p.numGames);run(p);});
+}
+
+function demoReport() {
+  // Explicitly illustrative numbers and legal board positions; never a claimed live analysis.
+  const c=new Chess(); for(const move of ['e4','e5','Nf3','Nc6','Bc4','Nf6']) c.move(move);
+  const example=decorateMistake({game_num:2,move_number:4,move_label:'4.',phase:'opening',theme:'opening',opening:'Italian Game',fen_before:c.fen(),played_uci:'f3e5',best_uci:'d2d3',played_san:'Nxe5',best_san:'d3',played_eval:-160,best_eval:30,drop:0.35,orientation:true});
+  return {demo:true,username:'sample-player',site:'Lichess',time_control:'blitz & rapid',games_analyzed:5,requested_games:5,total_mistakes:12,total_inaccuracies:8,avg_mistakes:2.4,weaknesses:[{key:'hung',name:'Hanging pieces',tip:THEME_META.hung.tip,count:6},{key:'opening',name:'Opening mistakes',tip:THEME_META.opening.tip,count:4},{key:'endgame',name:'Endgame technique',tip:THEME_META.endgame.tip,count:2}],time_trouble:{count:4,pct:40,sampled:10},has_clock:true,phase_breakdown:[{phase:'middlegame',count:7,time_trouble:3},{phase:'opening',count:4,time_trouble:0},{phase:'endgame',count:1,time_trouble:1}],worst_openings:[['Italian Game',5],['Queen’s Gambit',4]],losing_openings:[['Italian Game',2]],key_mistakes:[example],opening_weaknesses:[],opening_samples:{'Italian Game':3,'Queen’s Gambit':2}};
 }

@@ -17,3 +17,5 @@ SoccerScores.dSYM/
 
 # macOS
 .DS_Store
+tmp/
+output/

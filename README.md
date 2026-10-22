@@ -1,5 +1,13 @@
 # Chess Weakness Finder
 
+## October 2026 update
+
+The app now includes a responsive landing page, an explicitly labeled sample report (`?demo=1`), personalized seven-day practice plans, local recent-analysis summaries, and an installable web-app shell. Stockfish uses WebAssembly where supported, with the original JavaScript engine as a fallback. A buffered first UCI command was fixed by terminating commands with newlines.
+
+For the prepared paid offer, payment-link setup, hosting and launch steps, see [MONETIZATION.md](MONETIZATION.md). The printable journal and shop listing are generated locally under `output/`; they are deliberately outside the public `static/` directory.
+
+Run `npm test` for analysis, engine, plan, history and checkout-URL checks. To rebuild the journal, run `python scripts/build-journal.py` with ReportLab and pypdf installed.
+
 A web app that analyzes a chess player's recent games and reports where their
 mistakes actually happen — by game phase and by opening. Pick a site
 ([Lichess](https://lichess.org) or [Chess.com](https://chess.com)), enter a

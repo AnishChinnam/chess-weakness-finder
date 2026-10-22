@@ -10,6 +10,9 @@
     <meta property="og:description" content="Find the mistakes you keep making. Free Stockfish analysis of your recent Lichess or Chess.com games.">
     <meta name="twitter:card" content="summary">
     <meta name="theme-color" content="#0e1117">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="stylesheet" href="product.css">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>♞</text></svg>">
     <style>
         :root {
@@ -161,16 +164,24 @@
 </head>
 <body>
     <div class="wrap">
+        <nav class="topbar" aria-label="Main navigation"><a href="./" class="wordmark">♞ <span>Chess Weakness Finder</span></a><div><a href="#how-it-works">How it works</a><button id="install" class="action hidden" type="button">Install app</button></div></nav>
         <!-- HOME -->
-        <div id="home" class="card">
+        <main id="home">
+          <div class="hero-layout">
+          <section class="hero-copy">
+            <p class="eyebrow">LESS GUESSING. MORE PURPOSEFUL PRACTICE.</p>
+            <h1>Stop repeating<br>the same <span>mistakes.</span></h1>
+            <p class="hero-description">Your games already show what to work on. Find your recurring chess weaknesses and leave with a seven-day practice plan.</p>
+            <div class="trust-row"><span>✓ Free analysis</span><span>✓ No login</span><span>✓ Runs on your device</span></div>
+            <button type="button" id="demo" class="demo-button">Explore a sample report <span>↗</span></button>
+            <div class="mini-board" aria-hidden="true"><span>♜</span><span></span><span>♝</span><span>♛</span><span></span><span>♞</span><span></span><span>♚</span><span></span><span>♟</span><span></span><span>♟</span><span>♟</span><span></span><span>♟</span><span></span><div class="board-caption">Find the pattern.<br><strong>Change your next move.</strong></div></div>
+          </section>
+          <section class="card analyzer-card" aria-label="Analyze your games">
             <div class="brand">
-                <span class="piece">♞</span>
-                <h1>Chess Weakness Finder</h1>
+                <span class="piece">♞</span><h2>Find your focus</h2>
             </div>
             <p class="subtitle">
-                Pick a site and a username. Stockfish runs <em>right in your browser</em> to
-                replay their recent games and reveal where mistakes actually happen —
-                by phase, by opening, and on the board.
+                Enter your public chess username. We’ll review your recent games with Stockfish.
             </p>
             <form id="form">
                 <div class="field">
@@ -207,16 +218,23 @@
                 <button type="submit" class="cta" id="go">Analyze weaknesses</button>
             </form>
             <p class="note">
-                Analysis runs on your device, so nothing is uploaded and it's free to run.<br>
-                ~20–40 seconds for 5 games; longer for 100. ☕
+                No password needed. Start with 5 games.<br>
+                Analysis time varies with game length and your device. Keep this tab open.
             </p>
-        </div>
+          </section>
+          </div>
+          <section id="recent" class="recent-panel hidden"><div class="section-heading"><div><p class="eyebrow">SAVED ON THIS DEVICE</p><h2>Your recent check-ins</h2></div><button class="back" id="clear-history" type="button">Clear history</button></div><div id="recent-list"></div><p class="small-print">Up to five summaries are stored in this browser. Reanalyze fetches fresh games; it does not restore the old report.</p></section>
+          <section id="how-it-works" class="how-section"><p class="eyebrow">FROM YOUR GAMES TO YOUR NEXT SESSION</p><h2>Know what to practice. Then practice it.</h2><div class="feature-grid"><article><span>01 / REVIEW</span><h3>See the recurring pattern</h3><p>Find where mistakes cluster: openings, later moves, tactics or time pressure.</p></article><article><span>02 / UNDERSTAND</span><h3>Go back to the position</h3><p>Compare your move with the engine’s suggestion on a board, not just a score.</p></article><article><span>03 / PRACTICE</span><h3>Take a plan with you</h3><p>Download a seven-day routine tailored to the themes flagged in your games.</p></article></div></section>
+          <section class="faq-section"><p class="eyebrow">BEFORE YOU START</p><h2>A few things to know</h2><details><summary>Is this free?</summary><p>Yes. Analysis, your practice plan and saved summaries are free. Optional purchases or support links may be shown separately.</p></details><details><summary>How accurate is the analysis?</summary><p>Stockfish runs short searches on your device. Results can differ from deeper analysis, and theme labels are estimates. Move-number phases are a simple grouping, not a material-based definition. Use a larger sample before drawing conclusions.</p></details><details><summary>Do I need to connect my account?</summary><p>No. Enter a public Lichess or Chess.com username. We fetch public games directly from that service. Your password is never requested.</p></details><details><summary>Can I install this like an app?</summary><p>Yes, on supported browsers. Use Install app when offered, or your browser’s Add to Dock / Add to Home Screen option. Fetching new games requires internet access.</p></details></section>
+          <div id="home-commerce"></div>
+        </main>
 
         <!-- PROGRESS -->
         <div id="progress" class="progress-box hidden">
             <div class="brand" style="justify-content:center"><span class="piece">♞</span><h1>Analyzing…</h1></div>
             <div class="bar-outer" id="bar-outer" role="progressbar" aria-label="Analysis progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="bar-inner" id="bar"></div></div>
             <div class="progress-text" id="progress-text">Starting engine…</div>
+            <p class="note">Keep this tab visible while analyzing. Background tabs and slower devices can take longer.</p>
             <p class="note"><button type="button" class="back" id="cancel">Cancel</button></p>
         </div>
 
@@ -227,10 +245,10 @@
             Games are fetched from the public Lichess and Chess.com APIs and analyzed on your device; nothing is sent to our servers.<br>
             Powered by <a href="https://github.com/niklasf/stockfish.js" target="_blank" rel="noopener">Stockfish.js</a> (GPLv3) and
             <a href="https://github.com/jhlywa/chess.js" target="_blank" rel="noopener">chess.js</a>. Not affiliated with Lichess or Chess.com.
-            Some training links may be affiliate links.
+            <a href="privacy.html">Privacy &amp; disclosures</a> · <a href="about.html">About the analysis</a>
         </footer>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app.js?v=20261022d"></script>
 </body>
 </html>

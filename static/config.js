@@ -7,7 +7,15 @@ export const CONFIG = {
 
   // "Buy me a coffee" style tip link (Ko-fi, Buy Me a Coffee, GitHub Sponsors, Stripe Payment Link…).
   tipUrl: "",
-  tipLabel: "☕ Found this useful? Support the project",
+  tipLabel: "Leave a tip",
+
+  // Sell the included training journal through a real digital-download shop.
+  // The button is hidden until the HTTPS checkout URL is configured.
+  shop: { url: "", label: "Get the training journal · $3" },
+
+  // A direct sponsor placement, hidden until all required fields are present.
+  // Agree payment and dates with the sponsor before enabling it.
+  sponsor: { name: "", description: "", url: "", label: "Explore" },
 
   // Email capture. Point formAction at a newsletter provider's embed endpoint
   // (e.g. Buttondown: https://buttondown.com/api/emails/embed-subscribe/<you>).

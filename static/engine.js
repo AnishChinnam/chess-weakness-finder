@@ -1,6 +1,9 @@
 // A single UCI search at a time. Failed searches never become invented scores.
 export class Engine {
-  constructor(signal, { workerFactory = () => new Worker(new URL('./vendor/stockfish.js', import.meta.url)), startupTimeout = 15000 } = {}) {
+  constructor(signal, { workerFactory = () => {
+    const wasm = typeof WebAssembly === 'object' && WebAssembly.validate(Uint8Array.of(0,97,115,109,1,0,0,0));
+    return new Worker(new URL(wasm ? './vendor/stockfish.wasm.js' : './vendor/stockfish.js', import.meta.url));
+  }, startupTimeout = 15000 } = {}) {
     this.signal = signal;
     this.startupTimeout = startupTimeout;
     this.worker = workerFactory();
@@ -16,9 +19,10 @@ export class Engine {
     if (this.closed) return Promise.reject(new Error('The engine has stopped. Start a new analysis.'));
     if (this.pending) return Promise.reject(new Error('An engine search is already running.'));
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => this.quit(new Error('Stockfish stopped responding. Please try a smaller game sample.')), timeout);
+      const timer = setTimeout(() => this.quit(new Error('Stockfish stopped responding. Keep this tab active and try again.')), timeout);
       this.pending = { kind, resolve, reject, timer, cp: null, mate: null };
-      try { commands.forEach(command => this.worker.postMessage(command)); }
+      // The bundled engine reads a line-oriented stream; terminate queued input.
+      try { commands.forEach(command => this.worker.postMessage(command + '\n')); }
       catch (error) { this.quit(error); }
     });
   }
@@ -50,10 +54,12 @@ export class Engine {
     }
   }
   init() { return this.wait('init', this.startupTimeout, ['uci']); }
-  newGame() { this.worker.postMessage('ucinewgame'); }
+  newGame() { this.worker.postMessage('ucinewgame\n'); }
   analyse(fen, movetime) {
     this.turn = fen.split(' ')[1];
-    return this.wait('search', movetime + 5000, ['position fen ' + fen, 'go movetime ' + movetime]);
+    // Browser throttling can make a short search take much longer in wall time.
+    // Bound both work and time; a slow search must still fail rather than invent a score.
+    return this.wait('search', movetime + 30000, ['position fen ' + fen, 'go movetime ' + movetime + ' nodes 5000']);
   }
   quit(error = new DOMException('Analysis stopped', 'AbortError')) {
     if (this.closed) return;
